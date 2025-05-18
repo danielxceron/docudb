@@ -1,0 +1,246 @@
+/**
+ * Schema module for data validation
+ * Allows defining structure and validating documents
+ */
+
+const { MCO_ERROR, DocuDBError } = require('../errors/errors')
+
+class Schema {
+  /**
+   * @param {Object} definition - Schema definition
+   * @param {Object} options - Additional options
+   */
+  constructor (definition, options = {}) {
+    this.definition = definition
+    this.options = {
+      strict: options.strict !== false,
+      timestamps: options.timestamps === true,
+      ...options
+    }
+  }
+
+  /**
+   * Validates a document against the schema
+   * @param {Object} document - Document to validate
+   * @returns {Object} - Validated and normalized document
+   * @throws {Error} - If the document does not comply with the schema
+   */
+  validate (document) {
+    if (!document || typeof document !== 'object') {
+      throw new DocuDBError('The document must be an object', MCO_ERROR.SCHEMA.INVALID_DOCUMENT)
+    }
+
+    const validatedDoc = {}
+
+    // Validate each field according to the schema definition
+    for (const [field, fieldDef] of Object.entries(this.definition)) {
+      const value = document[field]
+
+      // Check if the field is required
+      if (fieldDef.required && (value === undefined || value === null)) {
+        throw new DocuDBError(
+          `The '${field}' field is required`,
+          MCO_ERROR.SCHEMA.REQUIRED_FIELD,
+          { field }
+        )
+      }
+
+      // If the value is not defined and not required, use default value or skip
+      if (value === undefined || value === null) {
+        if ('default' in fieldDef) {
+          validatedDoc[field] = typeof fieldDef.default === 'function'
+            ? fieldDef.default()
+            : fieldDef.default
+        }
+        continue
+      }
+
+      // Validate type
+      if (!this._validateType(value, fieldDef.type)) {
+        throw new DocuDBError(
+          `The '${field}' field must be of type ${fieldDef.type}`,
+          MCO_ERROR.SCHEMA.INVALID_TYPE,
+          { field, type: fieldDef.type, value }
+        )
+      }
+
+      // Validate additional rules
+      if (fieldDef.validate) {
+        try {
+          this._runValidators(value, fieldDef.validate, field)
+        } catch (error) {
+          throw new DocuDBError(
+            error.message,
+            error.code || MCO_ERROR.SCHEMA.VALIDATION_ERROR,
+            { field, ...error.details }
+          )
+        }
+      }
+
+      // Apply transformations if they exist
+      if (fieldDef.transform && typeof fieldDef.transform === 'function') {
+        validatedDoc[field] = fieldDef.transform(value)
+      } else {
+        validatedDoc[field] = value
+      }
+    }
+
+    // In strict mode, verify there are no additional fields
+    if (this.options.strict) {
+      for (const field in document) {
+        if (!(field in this.definition) && !field.startsWith('_')) {
+          throw new DocuDBError(
+            `Field not allowed: '${field}'`,
+            MCO_ERROR.SCHEMA.INVALID_FIELD,
+            { field }
+          )
+        }
+      }
+    }
+
+    // Add additional fields if not in strict mode
+    if (!this.options.strict) {
+      for (const field in document) {
+        if (!(field in this.definition) && !field.startsWith('_')) {
+          validatedDoc[field] = document[field]
+        }
+      }
+    }
+
+    // Add timestamps if enabled
+    if (this.options.timestamps) {
+      const now = new Date()
+      if (!document._createdAt) {
+        validatedDoc._createdAt = now
+      } else {
+        validatedDoc._createdAt = document._createdAt
+      }
+      validatedDoc._updatedAt = now
+    }
+
+    return validatedDoc
+  }
+
+  /**
+   * Validates the type of a value
+   * @param {*} value - Value to validate
+   * @param {string|Function} type - Expected type
+   * @returns {boolean} - Indicates if the value is of the expected type
+   * @private
+   */
+  _validateType (value, type) {
+    if (typeof type === 'function') {
+      return value instanceof type
+    }
+
+    switch (type) {
+      case 'string':
+        return typeof value === 'string'
+      case 'number':
+        return typeof value === 'number' && !isNaN(value)
+      case 'boolean':
+        return typeof value === 'boolean'
+      case 'date':
+        return value instanceof Date
+      case 'array':
+        return Array.isArray(value)
+      case 'object':
+        return typeof value === 'object' && value !== null && !Array.isArray(value)
+      default:
+        return true // Unknown type, assume valid
+    }
+  }
+
+  /**
+   * Executes custom validators
+   * @param {*} value - Value to validate
+   * @param {Function|Array|Object} validators - Validators to execute
+   * @returns {Object} - Validation result
+   * @private
+   */
+  _runValidators (value, validators, field) {
+    // If it's a function, execute it directly
+    if (typeof validators === 'function') {
+      try {
+        const result = validators(value)
+        if (result !== true) {
+          throw new DocuDBError(
+            result || 'Validation failed',
+            MCO_ERROR.SCHEMA.VALIDATION_ERROR,
+            { field, value }
+          )
+        }
+      } catch (error) {
+        if (error instanceof DocuDBError) throw error
+        throw new DocuDBError(
+          error.message,
+          MCO_ERROR.SCHEMA.VALIDATION_ERROR,
+          { field, value }
+        )
+      }
+    } else if (Array.isArray(validators)) {
+      for (const validator of validators) {
+        this._runValidators(value, validator, field)
+      }
+    } else if (typeof validators === 'object') {
+      // Validate min/max for numbers
+      if (typeof value === 'number') {
+        if ('min' in validators && value < validators.min) {
+          throw new DocuDBError(
+            `The value must be greater than or equal to ${validators.min}`,
+            MCO_ERROR.SCHEMA.INVALID_VALUE,
+            { field, value, min: validators.min }
+          )
+        }
+        if ('max' in validators && value > validators.max) {
+          throw new DocuDBError(
+            `The value must be less than or equal to ${validators.max}`,
+            MCO_ERROR.SCHEMA.INVALID_VALUE,
+            { field, value, max: validators.max }
+          )
+        }
+      }
+      // Validate minLength/maxLength for strings and arrays
+      if (typeof value === 'string' || Array.isArray(value)) {
+        if ('minLength' in validators && value.length < validators.minLength) {
+          throw new DocuDBError(
+            `The length must be greater than or equal to ${validators.minLength}`,
+            MCO_ERROR.SCHEMA.INVALID_LENGTH,
+            { field, value, minLength: validators.minLength, currentLength: value.length }
+          )
+        }
+        if ('maxLength' in validators && value.length > validators.maxLength) {
+          throw new DocuDBError(
+            `The length must be less than or equal to ${validators.maxLength}`,
+            MCO_ERROR.SCHEMA.INVALID_LENGTH,
+            { field, value, maxLength: validators.maxLength, currentLength: value.length }
+          )
+        }
+      }
+      // Validate pattern for strings
+      if (typeof value === 'string' && validators.pattern) {
+        const pattern = validators.pattern instanceof RegExp
+          ? validators.pattern
+          : new RegExp(validators.pattern)
+
+        if (!pattern.test(value)) {
+          throw new DocuDBError(
+            'Does not match the required pattern',
+            MCO_ERROR.SCHEMA.INVALID_REGEX,
+            { field, value, pattern: pattern.toString() }
+          )
+        }
+      }
+      // Validate enum
+      if (validators.enum && !validators.enum.includes(value)) {
+        throw new DocuDBError(
+          `The value must be one of: ${validators.enum.join(', ')}`,
+          MCO_ERROR.SCHEMA.INVALID_ENUM,
+          { field, value, allowedValues: validators.enum }
+        )
+      }
+    }
+  }
+}
+
+module.exports = Schema

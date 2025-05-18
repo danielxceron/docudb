@@ -1,0 +1,43 @@
+/**
+ * Compression/decompression module using Node.js zlib
+ * Provides functions to compress and decompress data
+ */
+
+const zlib = require('zlib')
+const { promisify } = require('util')
+const { MCO_ERROR, DocuDBError } = require('../errors/errors')
+
+// Convert callback functions to promises
+const gzipPromise = promisify(zlib.gzip)
+const gunzipPromise = promisify(zlib.gunzip)
+
+/**
+ * Compresses data using gzip
+ * @param {Buffer|string} data - Data to compress
+ * @returns {Promise<Buffer>} - Compressed data
+ */
+async function compress (data) {
+  try {
+    return await gzipPromise(data)
+  } catch (error) {
+    throw new DocuDBError(`Error compressing data: ${error.message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
+  }
+}
+
+/**
+ * Decompresses gzip compressed data
+ * @param {Buffer} compressedData - Compressed data
+ * @returns {Promise<Buffer>} - Decompressed data
+ */
+async function decompress (compressedData) {
+  try {
+    return await gunzipPromise(compressedData)
+  } catch (error) {
+    throw new DocuDBError(`Error decompressing data: ${error.message}`, MCO_ERROR.COMPRESSION.DECOMPRESS_ERROR, { originalError: error })
+  }
+}
+
+module.exports = {
+  compress,
+  decompress
+}
