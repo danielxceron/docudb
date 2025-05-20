@@ -1,8 +1,12 @@
-const { Database, Schema } = require('../index')
-const { expect } = require('chai')
-const fs = require('fs')
-const path = require('path')
-const { isValidUUID } = require('../src/utils/uuidUtils')
+import { Database, Schema } from '../index.js'
+import { expect } from 'chai'
+import fs from 'node:fs'
+import path from 'node:path'
+import { isValidUUID } from '../src/utils/uuidUtils.js'
+
+import { fileURLToPath } from 'node:url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 describe('DocuDB - UUID Support and Custom Default Functions', () => {
   let db

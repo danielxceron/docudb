@@ -3,9 +3,9 @@
  * Provides functions to compress and decompress data
  */
 
-const zlib = require('zlib')
-const { promisify } = require('util')
-const { MCO_ERROR, DocuDBError } = require('../errors/errors')
+import zlib from 'node:zlib'
+import { promisify } from 'node:util'
+import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 
 // Convert callback functions to promises
 const gzipPromise = promisify(zlib.gzip)
@@ -37,7 +37,7 @@ async function decompress (compressedData) {
   }
 }
 
-module.exports = {
+export default {
   compress,
   decompress
 }

@@ -3,7 +3,7 @@
  * Implements a simple and powerful query language for filtering documents
  */
 
-const { MCO_ERROR, DocuDBError } = require('../errors/errors')
+import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 
 class Query {
   /**
@@ -351,4 +351,4 @@ class Query {
   }
 }
 
-module.exports = Query
+export default Query

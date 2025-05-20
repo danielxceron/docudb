@@ -3,17 +3,18 @@
  * Integrates all components and provides the CRUD interface
  */
 
-const fs = require('fs')
-const path = require('path')
-const { promisify } = require('util')
-const crypto = require('crypto')
+import fs from 'node:fs'
+import path from 'node:path'
+import { promisify } from 'node:util'
+import crypto from 'node:crypto'
 
-const FileStorage = require('../storage/fileStorage')
-const IndexManager = require('../index/indexManager')
-const Query = require('../query/query')
-const { MCO_ERROR, DocuDBError } = require('../errors/errors')
-const { fileExists } = require('../utils/fileUtils')
-const deepCopy = require('../utils/deepCopy')
+import FileStorage from '../storage/fileStorage.js'
+import IndexManager from '../index/indexManager.js'
+import Query from '../query/query.js'
+import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
+import { fileExists } from '../utils/fileUtils.js'
+import deepCopy from '../utils/deepCopy.js'
+import { isValidID } from '../utils/uuidUtils.js'
 
 const mkdirPromise = promisify(fs.mkdir)
 const readFilePromise = promisify(fs.readFile)
@@ -312,7 +313,6 @@ class Collection {
 
         // Validate ID format if provided and not using custom schema validation
         if (!skipDefaultIdValidation) {
-          const { isValidID } = require('../utils/uuidUtils')
           if (!isValidID(validatedDoc._id)) {
             throw new DocuDBError(
               'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
@@ -409,7 +409,6 @@ class Collection {
 
       // Validate ID format if not using custom schema validation
       if (!skipDefaultIdValidation) {
-        const { isValidID } = require('../utils/uuidUtils')
         if (!id || typeof id !== 'string' || !isValidID(id)) {
           throw new DocuDBError(
             'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
@@ -538,7 +537,6 @@ class Collection {
 
       // Validate ID format if not using custom schema validation
       if (!skipDefaultIdValidation) {
-        const { isValidID } = require('../utils/uuidUtils')
         if (!id || typeof id !== 'string' || !isValidID(id)) {
           throw new DocuDBError(
             'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
@@ -708,7 +706,6 @@ class Collection {
 
       // Validate ID format if not using custom schema validation
       if (!skipDefaultIdValidation) {
-        const { isValidID } = require('../utils/uuidUtils')
         if (!id || typeof id !== 'string' || !isValidID(id)) {
           throw new DocuDBError(
             'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
@@ -1344,4 +1341,4 @@ class Collection {
   }
 }
 
-module.exports = Database
+export default Database

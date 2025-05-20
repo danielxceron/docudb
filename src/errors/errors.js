@@ -132,7 +132,7 @@ class DocuDBError extends Error {
   }
 }
 
-module.exports = {
+export {
   MCO_ERROR,
   DocuDBError
 }

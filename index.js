@@ -5,13 +5,13 @@
 * Now with UUID v4 support and custom default functions
 */
 
-const Database = require('./src/core/database')
-const Schema = require('./src/schema/schema')
-const Query = require('./src/query/query')
-const { MCO_ERROR, DocuDBError } = require('./src/errors/errors')
-const { generateUUID, isValidUUID, isValidID } = require('./src/utils/uuidUtils')
+import Database from './src/core/database.js'
+import Schema from './src/schema/schema.js'
+import Query from './src/query/query.js'
+import { MCO_ERROR, DocuDBError } from './src/errors/errors.js'
+import { generateUUID, isValidUUID, isValidID } from './src/utils/uuidUtils.js'
 
-module.exports = {
+export {
   Database,
   Schema,
   Query,

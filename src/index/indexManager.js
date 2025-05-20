@@ -3,11 +3,11 @@
  * Handles the creation and use of indexes to optimize searches
  */
 
-const fs = require('fs')
-const path = require('path')
-const { promisify } = require('util')
-const { fileExists } = require('../utils/fileUtils')
-const { MCO_ERROR, DocuDBError } = require('../errors/errors')
+import fs from 'node:fs'
+import path from 'node:path'
+import { promisify } from 'node:util'
+import { fileExists } from '../utils/fileUtils.js'
+import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 
 const readFilePromise = promisify(fs.readFile)
 const writeFilePromise = promisify(fs.writeFile)
@@ -516,4 +516,4 @@ class IndexManager {
   }
 }
 
-module.exports = IndexManager
+export default IndexManager

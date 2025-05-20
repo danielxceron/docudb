@@ -1,9 +1,20 @@
-const { expect } = require('chai')
-const Database = require('../src/core/database')
-const fs = require('fs')
-const path = require('path')
-const { promisify } = require('util')
-const rimraf = promisify(require('rimraf'))
+import { expect } from 'chai'
+import Database from '../src/core/database.js'
+import fs from 'node:fs'
+import path from 'node:path'
+
+import { fileURLToPath } from 'node:url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+async function modernRemove (path) {
+  try {
+    await fs.promises.rm(path, { recursive: true, force: true })
+  } catch (error) {
+    console.error(`Error deleting ${path}:`, error)
+    throw error
+  }
+}
 
 describe('Collection.updatePosition', function () {
   this.timeout(10000)
@@ -16,7 +27,7 @@ describe('Collection.updatePosition', function () {
     // Clean test data directory
     const testDataDir = path.join(__dirname, 'data')
     if (fs.existsSync(testDataDir)) {
-      await rimraf(testDataDir)
+      await modernRemove(testDataDir)
     }
 
     // Initialize database
@@ -45,7 +56,7 @@ describe('Collection.updatePosition', function () {
     // Clean up after tests
     const testDataDir = path.join(__dirname, 'data')
     if (fs.existsSync(testDataDir)) {
-      await rimraf(testDataDir)
+      await modernRemove(testDataDir)
     }
   })
 

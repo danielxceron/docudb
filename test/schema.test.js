@@ -1,7 +1,11 @@
-const { Database, Schema, Query } = require('../index')
-const { expect } = require('chai')
-const fs = require('fs')
-const path = require('path')
+import { Database, Schema, Query } from '../index.js'
+import { expect } from 'chai'
+import fs from 'node:fs'
+import path from 'node:path'
+
+import { fileURLToPath } from 'node:url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 describe('DocuDB - Schema Validation', () => {
   let db

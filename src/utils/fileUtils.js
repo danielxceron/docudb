@@ -3,7 +3,7 @@
  * Contains common functions used in various project modules
  */
 
-const fs = require('fs')
+import fs from 'node:fs'
 
 /**
  * Checks if a file or directory exists
@@ -20,6 +20,6 @@ async function fileExists (filePath) {
   }
 }
 
-module.exports = {
+export {
   fileExists
 }

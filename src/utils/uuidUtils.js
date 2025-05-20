@@ -3,7 +3,7 @@
  * Provides functions for UUID generation and validation
  */
 
-const crypto = require('crypto')
+import crypto from 'node:crypto'
 
 /**
  * Generates a UUID v4 string
@@ -43,7 +43,7 @@ function isValidID (id) {
   return isValidUUID(id) || isValidMongoID(id)
 }
 
-module.exports = {
+export {
   generateUUID,
   isValidUUID,
   isValidMongoID,

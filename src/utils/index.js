@@ -3,10 +3,7 @@
  * Exports all utility functions available in the project
  */
 
-const fileUtils = require('./fileUtils')
-const deepCopy = require('./deepCopy')
+import fileUtils from './fileUtils.js'
+import deepCopy from './deepCopy.js'
 
-module.exports = {
-  ...fileUtils,
-  deepCopy
-}
+export default { ...fileUtils, deepCopy }

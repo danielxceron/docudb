@@ -17,7 +17,7 @@ A lightweight, document-based NoSQL database for NodeJS with no external depende
 
 ## Requirements
 
-- Node.js >= 12.0.0
+- Node.js >= 14.14.1
 
 ## Installation
 
@@ -34,7 +34,7 @@ npm install --save docudb
 ## Quick Start
 
 ```javascript
-const { Database, Schema } = require('docudb');
+import { Database, Schema } from 'docudb';
 
 // Create and initialize a database
 const db = new Database({

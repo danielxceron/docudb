@@ -3,12 +3,13 @@
  * Handles file reading/writing and chunks for the database
  */
 
-const fs = require('fs')
-const path = require('path')
-const { promisify } = require('util')
-const gzip = require('../compression/gzip')
-const { MCO_ERROR, DocuDBError } = require('../errors/errors')
-const { fileExists } = require('../utils/fileUtils')
+import fs from 'node:fs'
+import path from 'node:path'
+import { promisify } from 'node:util'
+
+import gzip from '../compression/gzip.js'
+import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
+import { fileExists } from '../utils/fileUtils.js'
 
 // Convert callback functions to promises
 const readFilePromise = promisify(fs.readFile)
@@ -173,4 +174,4 @@ class FileStorage {
   }
 }
 
-module.exports = FileStorage
+export default FileStorage

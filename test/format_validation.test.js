@@ -1,7 +1,11 @@
-const { Database, Schema } = require('../index')
-const { expect } = require('chai')
-const fs = require('fs')
-const path = require('path')
+import { Database, Schema } from '../index.js'
+import { expect } from 'chai'
+import fs from 'node:fs'
+import path from 'node:path'
+
+import { fileURLToPath } from 'node:url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 describe('DocuDB - Schema Format Validation', () => {
   let db
@@ -69,7 +73,6 @@ describe('DocuDB - Schema Format Validation', () => {
         })
         expect.fail('Should have thrown validation error for invalid email format')
       } catch (error) {
-        console.log(error)
         expect(error.message).to.include('Does not match the required pattern')
       }
 

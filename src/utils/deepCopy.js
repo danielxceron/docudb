@@ -26,4 +26,4 @@ const deepCopy = (obj) => {
   return copy
 }
 
-module.exports = deepCopy
+export default deepCopy

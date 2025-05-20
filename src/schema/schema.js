@@ -3,7 +3,7 @@
  * Allows defining structure and validating documents
  */
 
-const { MCO_ERROR, DocuDBError } = require('../errors/errors')
+import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 
 class Schema {
   /**
@@ -247,4 +247,4 @@ class Schema {
   }
 }
 
-module.exports = Schema
+export default Schema
