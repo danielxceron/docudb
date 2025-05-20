@@ -43,6 +43,9 @@ class Database {
       compression: options.compression !== false
     }
 
+    // ID generation options
+    this.idType = options.idType || 'mongo' // 'mongo' or 'uuid'
+
     this.storage = new FileStorage(this.storageOptions)
     this.indexManager = new IndexManager({ dataDir: this.dataDir })
   }
@@ -108,11 +111,17 @@ class Database {
 
     // If collection doesn't exist, create it
     if (!this.collections[collectionName]) {
+      // Pass database idType to collection if not specified in options
+      const collectionOptions = {
+        ...options,
+        idType: options.idType || this.idType
+      }
+
       this.collections[collectionName] = new Collection(
         collectionName,
         this.storage,
         this.indexManager,
-        options
+        collectionOptions
       )
     }
 
@@ -290,6 +299,28 @@ class Collection {
       // Generate ID if it doesn't exist
       if (!validatedDoc._id) {
         validatedDoc._id = this._generateId()
+      } else {
+        // Check if we have a schema with custom ID validation
+        let skipDefaultIdValidation = false
+        if (this.schema && this.schema.definition._id &&
+            this.schema.definition._id.validate &&
+            this.schema.definition._id.validate.pattern) {
+          // If we have a schema with pattern validation for _id, we'll let the schema handle it
+          // The schema validation has already run at this point
+          skipDefaultIdValidation = true
+        }
+
+        // Validate ID format if provided and not using custom schema validation
+        if (!skipDefaultIdValidation) {
+          const { isValidID } = require('../utils/uuidUtils')
+          if (!isValidID(validatedDoc._id)) {
+            throw new DocuDBError(
+              'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
+              MCO_ERROR.DOCUMENT.INVALID_ID,
+              { id: validatedDoc._id }
+            )
+          }
+        }
       }
 
       // Save document
@@ -367,20 +398,30 @@ class Collection {
    */
   async findById (id) {
     try {
-      // Validate that ID is a valid string and matches hexadecimal pattern
-      if (!id || typeof id !== 'string' || id.trim() === '') {
-        throw new DocuDBError(
-          'Invalid ID: must be a non-empty string',
-          MCO_ERROR.DOCUMENT.INVALID_ID
-        )
+      // Check if we have a schema with custom ID validation
+      let skipDefaultIdValidation = false
+      if (this.schema && this.schema.definition._id &&
+          this.schema.definition._id.validate &&
+          this.schema.definition._id.validate.pattern) {
+        // If we have a schema with pattern validation for _id, we'll skip the default validation
+        skipDefaultIdValidation = true
       }
 
-      // Validate that ID has correct format (24 hexadecimal characters)
-      const hexPattern = /^[0-9a-f]{24}$/
-      if (!hexPattern.test(id)) {
+      // Validate ID format if not using custom schema validation
+      if (!skipDefaultIdValidation) {
+        const { isValidID } = require('../utils/uuidUtils')
+        if (!id || typeof id !== 'string' || !isValidID(id)) {
+          throw new DocuDBError(
+            'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
+            MCO_ERROR.DOCUMENT.INVALID_ID,
+            { id }
+          )
+        }
+      } else if (!id || typeof id !== 'string') {
         throw new DocuDBError(
-          'Invalid ID: must be a 24-character hexadecimal string',
-          MCO_ERROR.DOCUMENT.INVALID_ID
+          'Invalid document ID format',
+          MCO_ERROR.DOCUMENT.INVALID_ID,
+          { id }
         )
       }
 
@@ -486,8 +527,31 @@ class Collection {
    */
   async updateById (id, update) {
     try {
-      if (!id || typeof id !== 'string') {
-        throw new DocuDBError('Invalid ID', MCO_ERROR.DOCUMENT.INVALID_DOCUMENT)
+      // Check if we have a schema with custom ID validation
+      let skipDefaultIdValidation = false
+      if (this.schema && this.schema.definition._id &&
+          this.schema.definition._id.validate &&
+          this.schema.definition._id.validate.pattern) {
+        // If we have a schema with pattern validation for _id, we'll skip the default validation
+        skipDefaultIdValidation = true
+      }
+
+      // Validate ID format if not using custom schema validation
+      if (!skipDefaultIdValidation) {
+        const { isValidID } = require('../utils/uuidUtils')
+        if (!id || typeof id !== 'string' || !isValidID(id)) {
+          throw new DocuDBError(
+            'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
+            MCO_ERROR.DOCUMENT.INVALID_ID,
+            { id }
+          )
+        }
+      } else if (!id || typeof id !== 'string') {
+        throw new DocuDBError(
+          'Invalid document ID format',
+          MCO_ERROR.DOCUMENT.INVALID_ID,
+          { id }
+        )
       }
 
       // Find document
@@ -633,8 +697,31 @@ class Collection {
    */
   async deleteById (id) {
     try {
-      if (!id || typeof id !== 'string') {
-        throw new DocuDBError('Invalid ID', MCO_ERROR.DOCUMENT.INVALID_DOCUMENT)
+      // Check if we have a schema with custom ID validation
+      let skipDefaultIdValidation = false
+      if (this.schema && this.schema.definition._id &&
+          this.schema.definition._id.validate &&
+          this.schema.definition._id.validate.pattern) {
+        // If we have a schema with pattern validation for _id, we'll skip the default validation
+        skipDefaultIdValidation = true
+      }
+
+      // Validate ID format if not using custom schema validation
+      if (!skipDefaultIdValidation) {
+        const { isValidID } = require('../utils/uuidUtils')
+        if (!id || typeof id !== 'string' || !isValidID(id)) {
+          throw new DocuDBError(
+            'Invalid document ID format. Must be a valid MongoDB ID or UUID v4',
+            MCO_ERROR.DOCUMENT.INVALID_ID,
+            { id }
+          )
+        }
+      } else if (!id || typeof id !== 'string') {
+        throw new DocuDBError(
+          'Invalid document ID format',
+          MCO_ERROR.DOCUMENT.INVALID_ID,
+          { id }
+        )
       }
 
       // Check if exists
@@ -1042,6 +1129,12 @@ class Collection {
    * @private
    */
   _generateId () {
+    // Check if UUID format is specified in options
+    if (this.options.idType === 'uuid') {
+      // Use crypto.randomUUID() for UUID v4 generation
+      return crypto.randomUUID()
+    }
+    // Default to MongoDB-style ID (12 bytes hex)
     return crypto.randomBytes(12).toString('hex')
   }
 

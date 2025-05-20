@@ -147,7 +147,7 @@ describe('DocuDB - Error Handling', () => {
         await productos.findById('id-no-valido')
         expect.fail('Should have thrown an error')
       } catch (error) {
-        expect(error.message).to.include('ID')
+        expect(error.message).to.include('Invalid document ID format')
       }
     })
 
@@ -156,7 +156,7 @@ describe('DocuDB - Error Handling', () => {
         await productos.updateById('id-no-valido', { $set: { campo: 'valor' } })
         expect.fail('Should have thrown an error')
       } catch (error) {
-        expect(error.message).to.include('ID')
+        expect(error.message).to.include('Invalid document ID format')
       }
     })
 
@@ -165,7 +165,29 @@ describe('DocuDB - Error Handling', () => {
         await productos.deleteById('id-no-valido')
         expect.fail('Should have thrown an error')
       } catch (error) {
-        expect(error.message).to.include('ID')
+        expect(error.message).to.include('Invalid document ID format')
+      }
+    })
+
+    it('should accept valid MongoDB-style IDs', async () => {
+      const validMongoId = '507f1f77bcf86cd799439011' // Valid 24-char hex
+      try {
+        // Just testing validation, not actual operation
+        await productos.findById(validMongoId)
+      } catch (error) {
+        // Should fail with NOT_FOUND, not INVALID_ID
+        expect(error.message).to.not.include('Invalid document ID format')
+      }
+    })
+
+    it('should accept valid UUID v4 IDs', async () => {
+      const validUuid = '123e4567-e89b-42d3-a456-556642440000' // Valid UUID format
+      try {
+        // Just testing validation, not actual operation
+        await productos.findById(validUuid)
+      } catch (error) {
+        // Should fail with NOT_FOUND, not INVALID_ID
+        expect(error.message).to.not.include('Invalid document ID format')
       }
     })
 

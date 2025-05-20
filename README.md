@@ -134,12 +134,64 @@ const schema = new Schema(definition, options);
 **Field Definition Properties:**
 - `type`: Data type ('string', 'number', 'boolean', 'date', 'object', 'array')
 - `required`: Whether the field is required (default: false)
-- `default`: Default value if not provided
-- `validate`: Validation rules (min, max, pattern, etc.)
+- `default`: Default value if not provided. Can be a static value or a function
+- `validate`: Validation rules (min, max, minLength, maxLength, pattern, enum, custom function)
+
+**Format Validation with Regular Expressions:**
+
+You can use the `pattern` property to validate string fields against regular expression patterns:
+
+```javascript
+const schema = new Schema({
+  email: { 
+    type: 'string', 
+    required: true,
+    validate: { 
+      pattern: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/ // Email pattern validation
+    }
+  },
+  customId: {
+    type: 'string',
+    validate: {
+      pattern: /^PROD-\d{4}$/ // Validate ID pattern (e.g., PROD-1234)
+    }
+  }
+});
+```
+
+**Custom Default Functions:**
+
+You can use functions as default values, which will be executed when a document is created:
+
+```javascript
+const schema = new Schema({
+  createdAt: { 
+    type: 'date', 
+    default: () => new Date() 
+  },
+  code: { 
+    type: 'string',
+    // The function receives the document being processed
+    default: (doc) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}` 
+  },
+  // You can even customize the _id field
+  _id: {
+    type: 'string',
+    default: () => generateUUID(), // Or any custom ID generation logic
+    validate: {
+      pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/ // UUID v4 pattern
+    }
+  }
+});
+```
 
 **Schema Options:**
 - `strict`: Reject fields not in the schema (default: true)
-- `timestamps`: Automatically add createdAt and updatedAt fields (default: false)
+- `timestamps`: Automatically add _createdAt and _updatedAt fields (default: false)
+
+**Collection Options:**
+- `schema`: Schema for document validation
+- `idType`: ID format to use ('uuid' for UUID v4, default: MongoDB-style IDs)
 
 ## Error Handling
 

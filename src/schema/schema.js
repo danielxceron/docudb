@@ -48,9 +48,13 @@ class Schema {
       // If the value is not defined and not required, use default value or skip
       if (value === undefined || value === null) {
         if ('default' in fieldDef) {
-          validatedDoc[field] = typeof fieldDef.default === 'function'
-            ? fieldDef.default()
-            : fieldDef.default
+          // Support for custom functions as default values
+          if (typeof fieldDef.default === 'function') {
+            // Pass the current document and field name to the function
+            validatedDoc[field] = fieldDef.default(document, field)
+          } else {
+            validatedDoc[field] = fieldDef.default
+          }
         }
         continue
       }
