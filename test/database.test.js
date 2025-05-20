@@ -175,4 +175,78 @@ describe('DocuDB - CRUD Operations', () => {
       expect(count).to.equal(0)
     })
   })
+
+  describe('Index Operations', () => {
+    let productIds = []
+
+    beforeEach(async () => {
+      const docs = await productos.insertMany([
+        { name: 'Laptop', price: 1000, stock: 5 },
+        { name: 'Mouse', price: 20, stock: 10 },
+        { name: 'Keyboard', price: 50, stock: 8 }
+      ])
+      productIds = docs.map(doc => doc._id)
+    })
+
+    it('should return the correct index for a document by ID', async () => {
+      const allDocs = await productos.find({})
+      const docIndexes = {}
+
+      allDocs.forEach((doc, index) => {
+        docIndexes[doc._id] = index
+      })
+
+      const index0 = await productos.getPosition(productIds[0])
+      expect(index0).to.equal(docIndexes[productIds[0]])
+
+      const index1 = await productos.getPosition(productIds[1])
+      expect(index1).to.equal(docIndexes[productIds[1]])
+
+      const index2 = await productos.getPosition(productIds[2])
+      expect(index2).to.equal(docIndexes[productIds[2]])
+    })
+
+    it('should return -1 for a non-existent document ID', async () => {
+      const index = await productos.getPosition('000000000000000000000000')
+      expect(index).to.equal(-1)
+    })
+
+    it('should find a document by its index', async () => {
+      const allDocs = await productos.find({})
+
+      // Verificar que podemos recuperar cada documento por su índice
+      for (let i = 0; i < allDocs.length; i++) {
+        const doc = await productos.findByPosition(i)
+        expect(doc).to.exist
+        expect(doc._id).to.equal(allDocs[i]._id)
+        expect(doc.name).to.equal(allDocs[i].name)
+        expect(doc.price).to.equal(allDocs[i].price)
+        expect(doc.stock).to.equal(allDocs[i].stock)
+      }
+    })
+
+    it('should return null for an out-of-bounds index', async () => {
+      const allDocs = await productos.find({})
+      const outOfBoundsIndex = allDocs.length + 10
+
+      const doc = await productos.findByPosition(outOfBoundsIndex)
+      expect(doc).to.be.null
+    })
+
+    it('should throw an error for an invalid index', async () => {
+      try {
+        await productos.findByPosition(-5)
+        expect.fail('Should have thrown an error')
+      } catch (error) {
+        expect(error.message).to.include('Invalid index')
+      }
+
+      try {
+        await productos.findByPosition('not-a-number')
+        expect.fail('Should have thrown an error')
+      } catch (error) {
+        expect(error.message).to.include('Invalid index')
+      }
+    })
+  })
 })

@@ -29,7 +29,11 @@ class Database {
    */
   constructor (options = {}) {
     this.name = options.name || 'docudb'
-    this.dataDir = path.join(options.dataDir || process.cwd(), 'data', this.name)
+    this.dataDir = path.join(
+      options.dataDir || process.cwd(),
+      'data',
+      this.name
+    )
     this.collections = {}
 
     // Storage options
@@ -226,7 +230,8 @@ class Collection {
       count: 0,
       indices: [],
       created: new Date(),
-      updated: new Date()
+      updated: new Date(),
+      documentOrder: []
     }
   }
 
@@ -302,6 +307,13 @@ class Collection {
 
       this.metadata.count++
       this.metadata.updated = new Date()
+
+      // Add document ID to the order array
+      if (!this.metadata.documentOrder) {
+        this.metadata.documentOrder = []
+      }
+      this.metadata.documentOrder.push(docId)
+
       await this._saveMetadata()
 
       // Update indices
@@ -650,6 +662,17 @@ class Collection {
       // Update metadata
       this.metadata.count = Math.max(0, this.metadata.count - 1)
       this.metadata.updated = new Date()
+
+      // Remove document ID from the order array
+      if (
+        this.metadata.documentOrder &&
+        Array.isArray(this.metadata.documentOrder)
+      ) {
+        this.metadata.documentOrder = this.metadata.documentOrder.filter(
+          docId => docId !== id
+        )
+      }
+
       await this._saveMetadata()
 
       return true
@@ -797,6 +820,150 @@ class Collection {
         `Error deleting index: ${error.message}`,
         MCO_ERROR.INDEX.DROP_ERROR,
         { collectionName: this.name, field, originalError: error }
+      )
+    }
+  }
+
+  /**
+   * Gets the index of a document by its ID in the collection
+   * @param {string} id - Document ID
+   * @returns {Promise<number>} - Index of the document or -1 if not found
+   */
+  async getPosition (id) {
+    try {
+      if (!id || typeof id !== 'string') {
+        throw new DocuDBError('Invalid ID', MCO_ERROR.DOCUMENT.INVALID_DOCUMENT)
+      }
+
+      // Validate that ID has correct format (24 hexadecimal characters)
+      const hexPattern = /^[0-9a-f]{24}$/
+      if (!hexPattern.test(id)) {
+        throw new DocuDBError(
+          'Invalid ID: must be a 24-character hexadecimal string',
+          MCO_ERROR.DOCUMENT.INVALID_ID
+        )
+      }
+
+      // Check if document exists
+      const doc = await this.findById(id)
+      if (!doc) {
+        return -1
+      }
+
+      // Load all documents to get their order
+      const allDocs = await this._loadAllDocuments()
+
+      // Find the index of the document with the given ID
+      const index = allDocs.findIndex(doc => doc._id === id)
+
+      return index
+    } catch (error) {
+      throw new DocuDBError(
+        `Error finding document index: ${error.message}`,
+        MCO_ERROR.DOCUMENT.QUERY_ERROR,
+        { collectionName: this.name, id, originalError: error }
+      )
+    }
+  }
+
+  /**
+   * Finds a document by its index in the collection
+   * @param {number} index - Index of the document in the collection
+   * @returns {Promise<Object|null>} - Document at the specified index or null if not found
+   */
+  async findByPosition (index) {
+    try {
+      if (typeof index !== 'number' || index < 0) {
+        throw new DocuDBError(
+          'Invalid index: must be a non-negative number',
+          MCO_ERROR.DOCUMENT.INVALID_DOCUMENT
+        )
+      }
+
+      // Load all documents to get their order
+      const allDocs = await this._loadAllDocuments()
+
+      // Check if index is within bounds
+      if (index >= allDocs.length) {
+        return null
+      }
+
+      // Return the document at the specified index
+      return allDocs[index]
+    } catch (error) {
+      throw new DocuDBError(
+        `Error finding document by index: ${error.message}`,
+        MCO_ERROR.DOCUMENT.QUERY_ERROR,
+        { collectionName: this.name, index, originalError: error }
+      )
+    }
+  }
+
+  /**
+   * Updates the position of a document in the collection
+   * @param {string} id - Document ID
+   * @param {number} newIndex - New index position for the document
+   * @returns {Promise<boolean>} - true if successfully updated, false if document not found
+   */
+  async updatePosition (id, newIndex) {
+    try {
+      if (!id || typeof id !== 'string') {
+        throw new DocuDBError('Invalid ID', MCO_ERROR.DOCUMENT.INVALID_DOCUMENT)
+      }
+
+      if (typeof newIndex !== 'number' || newIndex < 0) {
+        throw new DocuDBError(
+          'Invalid index: must be a non-negative number',
+          MCO_ERROR.DOCUMENT.INVALID_DOCUMENT
+        )
+      }
+
+      // Find the document
+      const doc = await this.findById(id)
+      if (!doc) {
+        return false
+      }
+
+      // Load all documents to get their order
+      const allDocs = await this._loadAllDocuments()
+
+      // Find current index
+      const currentIndex = allDocs.findIndex(doc => doc._id === id)
+      if (currentIndex === -1) {
+        return false
+      }
+
+      // If new index is out of bounds, adjust it to the last position
+      const adjustedNewIndex = Math.min(newIndex, allDocs.length - 1)
+
+      // If the index is the same, no need to update
+      if (currentIndex === adjustedNewIndex) {
+        return true
+      }
+
+      // Remove the document from its current position
+      const docToMove = allDocs.splice(currentIndex, 1)[0]
+
+      // Insert it at the new position
+      allDocs.splice(adjustedNewIndex, 0, docToMove)
+
+      // Save the order of the IDs in the metadata
+      this.metadata.documentOrder = allDocs.map(doc => doc._id)
+      await this._saveMetadata()
+
+      // Update the document cache to reflect the new order
+      this.documents = {}
+      for (const doc of allDocs) {
+        // Reload documents in the cache to maintain consistency
+        await this.findById(doc._id)
+      }
+
+      return true
+    } catch (error) {
+      throw new DocuDBError(
+        `Error updating document index: ${error.message}`,
+        MCO_ERROR.DOCUMENT.UPDATE_ERROR,
+        { collectionName: this.name, id, newIndex, originalError: error }
       )
     }
   }
@@ -1006,14 +1173,40 @@ class Collection {
         withFileTypes: true
       })
       const docs = []
+      const documentMap = {}
 
+      // First load all documents into a map
       for (const item of items) {
         if (item.isDirectory() && !item.name.startsWith('_')) {
           const docId = item.name
           const doc = await this.findById(docId)
           if (doc) {
-            docs.push(doc)
+            documentMap[docId] = doc
           }
+        }
+      }
+
+      // If there's a defined order in metadata, use it to order the documents
+      if (
+        this.metadata.documentOrder &&
+        Array.isArray(this.metadata.documentOrder)
+      ) {
+        // Add documents in the specified order
+        for (const docId of this.metadata.documentOrder) {
+          if (documentMap[docId]) {
+            docs.push(documentMap[docId])
+            delete documentMap[docId] // Remove to avoid duplication
+          }
+        }
+
+        // Add any document that's not in the order (new documents)
+        for (const docId in documentMap) {
+          docs.push(documentMap[docId])
+        }
+      } else {
+        // If there's no defined order, use the default order
+        for (const docId in documentMap) {
+          docs.push(documentMap[docId])
         }
       }
 
