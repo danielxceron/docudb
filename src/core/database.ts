@@ -891,10 +891,7 @@ export class Collection {
    * @param {Object} options - Index options
    * @returns {Promise<boolean>} - true if successfully created
    */
-  async createIndex (
-    field: string | string[],
-    options: object = {}
-  ): Promise<boolean> {
+  async createIndex (field: string | string[], options: IndexOptions = {}): Promise<boolean> {
     try {
       // Create index
       await this.indexManager.createIndex(this.name, field, options)
