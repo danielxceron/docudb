@@ -279,17 +279,13 @@ Create indexes to improve query performance:
 
 ```typescript
 // Create a simple index
-await products.createIndex({ field: 'name' });
+await products.createIndex('name');
 
 // Create a unique index
-await products.createIndex({ 
-  field: 'sku',
-  unique: true
-});
+await products.createIndex('name', { unique: true });
 
 // Create a compound index
-await products.createIndex({ 
-  field: ['category', 'brand'],
+await products.createIndex(['category', 'brand'], { 
   name: 'category_brand_idx'
 });
 ```
