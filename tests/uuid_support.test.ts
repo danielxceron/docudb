@@ -1,23 +1,18 @@
 import { Database, Schema } from '../index.js'
 import { expect } from 'chai'
-import fs from 'node:fs'
-import path from 'node:path'
 import { isValidUUID } from '../src/utils/uuidUtils.js'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { Document } from '../src/types/index.js'
+
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - UUID Support and Custom Default Functions', () => {
-  let db
+  let db: Database
   let products
   const testDbName = 'testUUID'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
 
     db = new Database({
       name: testDbName,
@@ -27,9 +22,7 @@ describe('DocuDB - UUID Support and Custom Default Functions', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('UUID ID Generation', () => {
@@ -80,7 +73,9 @@ describe('DocuDB - UUID Support and Custom Default Functions', () => {
       // Verify we can retrieve the document
       const retrieved = await uuidCollection.findById(uuid)
       expect(retrieved).to.exist
-      expect(retrieved.name).to.equal('User UUID Product')
+      if (retrieved != null) {
+        expect(retrieved.name).to.equal('User UUID Product')
+      }
     })
 
     it('should reject invalid ID formats', async () => {
@@ -93,7 +88,7 @@ describe('DocuDB - UUID Support and Custom Default Functions', () => {
           price: 300
         })
         expect.fail('Should have thrown an error for invalid ID format')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Invalid document ID format')
       }
     })
@@ -112,7 +107,7 @@ describe('DocuDB - UUID Support and Custom Default Functions', () => {
         code: {
           type: 'string',
           // Custom function that generates a code based on the document
-          default: (doc) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}`
+          default: (doc: Document) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}`
         }
       })
 
@@ -159,7 +154,9 @@ describe('DocuDB - UUID Support and Custom Default Functions', () => {
       // Verify we can retrieve the document
       const retrieved = await customCollection.findById(product._id)
       expect(retrieved).to.exist
-      expect(retrieved.name).to.equal('Custom ID Product')
+      if (retrieved != null) {
+        expect(retrieved.name).to.equal('Custom ID Product')
+      }
     })
   })
 })

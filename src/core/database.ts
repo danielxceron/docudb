@@ -15,20 +15,44 @@ import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 import { fileExists } from '../utils/fileUtils.js'
 import deepCopy from '../utils/deepCopy.js'
 import { isValidID } from '../utils/uuidUtils.js'
+import {
+  DatabaseOptions,
+  StorageOptions,
+  CollectionOptions,
+  CollectionMetadata,
+  Document,
+  UpdateOperations,
+  DocumentLocks,
+  DocumentWithId,
+  Schema,
+  IndexOptions
+} from '../types/index.js'
 
 const mkdirPromise = promisify(fs.mkdir)
 const readFilePromise = promisify(fs.readFile)
 const writeFilePromise = promisify(fs.writeFile)
 
 class Database {
+  /** Database name */
+  public name: string
+  /** Directory to store data */
+  public dataDir: string
+  /** Collections in this database */
+  public collections: Record<string, any>
+  /** Storage options */
+  public storageOptions: StorageOptions
+  /** ID generation type */
+  public idType: 'mongo' | 'uuid'
+  /** File storage instance */
+  public storage: FileStorage
+  /** Index manager instance */
+  public indexManager: IndexManager
+
   /**
-   * @param {Object} options - Configuration options
-   * @param {string} options.name - Database name
-   * @param {string} options.dataDir - Directory to store data
-   * @param {number} options.chunkSize - Maximum chunk size in bytes
-   * @param {boolean} options.compression - Indicates if compression should be used
+   * Creates a new database instance
+   * @param options - Configuration options
    */
-  constructor (options = {}) {
+  constructor (options: DatabaseOptions = {}) {
     this.name = options.name || 'docudb'
     this.dataDir = path.join(
       options.dataDir || process.cwd(),
@@ -73,7 +97,7 @@ class Database {
       if (!(await fileExists(this.dataDir))) {
         try {
           await mkdirPromise(this.dataDir, { recursive: true })
-        } catch (dirError) {
+        } catch (dirError: any) {
           throw new DocuDBError(
             `Error creating data directory: ${dirError.message}`,
             MCO_ERROR.DATABASE.INIT_ERROR,
@@ -87,7 +111,7 @@ class Database {
 
       // Load existing collections metadata
       await this._loadCollections()
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error initializing database: ${error.message}`,
         MCO_ERROR.DATABASE.INIT_ERROR,
@@ -102,7 +126,10 @@ class Database {
    * @param {Object} options - Collection options
    * @returns {Collection} - Collection instance
    */
-  collection (collectionName, options = {}) {
+  collection (
+    collectionName: string,
+    options: CollectionOptions = { idType: this.idType }
+  ): Collection {
     if (!collectionName || typeof collectionName !== 'string') {
       throw new DocuDBError(
         'Collection name must be a valid string',
@@ -115,7 +142,7 @@ class Database {
       // Pass database idType to collection if not specified in options
       const collectionOptions = {
         ...options,
-        idType: options.idType || this.idType
+        idType: options.idType
       }
 
       this.collections[collectionName] = new Collection(
@@ -134,7 +161,7 @@ class Database {
    * @param {string} collectionName - Name of collection to drop
    * @returns {Promise<boolean>} - true if successfully dropped
    */
-  async dropCollection (collectionName) {
+  async dropCollection (collectionName: string): Promise<boolean> {
     try {
       if (!this.collections[collectionName]) {
         return false
@@ -143,7 +170,7 @@ class Database {
       try {
         // Delete all documents and metadata
         await this.collections[collectionName].drop()
-      } catch (dropError) {
+      } catch (dropError: any) {
         // Ignore errors if directory doesn't exist
         if (!dropError.message.includes('ENOENT')) {
           throw dropError
@@ -160,7 +187,7 @@ class Database {
       delete this.collections[collectionName]
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error dropping collection: ${error.message}`,
         MCO_ERROR.COLLECTION.DROP_ERROR,
@@ -173,10 +200,10 @@ class Database {
    * Lists all collections
    * @returns {Promise<string[]>} - Collection names
    */
-  async listCollections () {
+  async listCollections (): Promise<string[]> {
     try {
       return Object.keys(this.collections)
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error listing collections: ${error.message}`,
         MCO_ERROR.DATABASE.COLLECTION_ERROR,
@@ -189,7 +216,7 @@ class Database {
    * Loads existing collections
    * @private
    */
-  async _loadCollections () {
+  async _loadCollections (): Promise<void> {
     try {
       // Read directories in data directory
       const items = await promisify(fs.readdir)(this.dataDir, {
@@ -211,7 +238,7 @@ class Database {
           await this.collections[collectionName].initialize()
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error loading collections: ${error.message}`,
         MCO_ERROR.DATABASE.LOAD_ERROR,
@@ -221,19 +248,32 @@ class Database {
   }
 }
 
-class Collection {
+export class Collection {
+  name: string
+  storage: FileStorage
+  indexManager: IndexManager
+  options: CollectionOptions
+  schema: Schema | null
+  documents: Record<string, Document>
+  metadataPath: string
+  metadata: CollectionMetadata
   /**
    * @param {string} name - Collection name
    * @param {FileStorage} storage - Storage instance
    * @param {IndexManager} indexManager - Index manager instance
    * @param {Object} options - Additional options
    */
-  constructor (name, storage, indexManager, options = {}) {
+  constructor (
+    name: string,
+    storage: FileStorage,
+    indexManager: IndexManager,
+    options: CollectionOptions = { idType: 'mongo' }
+  ) {
     this.name = name
     this.storage = storage
     this.indexManager = indexManager
     this.options = options
-    this.schema = options.schema || null
+    this.schema = options.schema != null ? options.schema : null
     this.documents = {} // Document cache
     this.metadataPath = path.join(storage.dataDir, name, '_metadata.json')
     this.metadata = {
@@ -264,11 +304,11 @@ class Collection {
       for (const indexDef of this.metadata.indices) {
         await this.indexManager.createIndex(
           this.name,
-          indexDef.field,
+          indexDef.field || '',
           indexDef.options
         )
       }
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error initializing collection: ${error.message}`,
         MCO_ERROR.COLLECTION.METADATA_ERROR,
@@ -279,10 +319,10 @@ class Collection {
 
   /**
    * Inserts a document into the collection
-   * @param {Object} doc - Document to insert
-   * @returns {Promise<Object>} - Inserted document with ID
+   * @param {Document} doc - Document to insert
+   * @returns {Promise<DocumentWithId>} - Inserted document with ID
    */
-  async insertOne (doc) {
+  async insertOne (doc: Document): Promise<DocumentWithId> {
     try {
       if (!doc || typeof doc !== 'object') {
         throw new DocuDBError(
@@ -293,7 +333,7 @@ class Collection {
 
       // Validate schema if exists
       let validatedDoc = doc
-      if (this.schema) {
+      if (this.schema != null) {
         validatedDoc = this.schema.validate(doc)
       }
 
@@ -303,9 +343,12 @@ class Collection {
       } else {
         // Check if we have a schema with custom ID validation
         let skipDefaultIdValidation = false
-        if (this.schema && this.schema.definition._id &&
-            this.schema.definition._id.validate &&
-            this.schema.definition._id.validate.pattern) {
+        if (
+          (this.schema != null) &&
+          this.schema.definition._id &&
+          (this.schema.definition._id.validate != null) &&
+          (this.schema.definition._id.validate.pattern != null)
+        ) {
           // If we have a schema with pattern validation for _id, we'll let the schema handle it
           // The schema validation has already run at this point
           skipDefaultIdValidation = true
@@ -332,6 +375,7 @@ class Collection {
 
       // Update metadata
       this.documents[docId] = {
+        _id: docId,
         data: validatedDoc,
         chunkPaths
       }
@@ -348,10 +392,14 @@ class Collection {
       await this._saveMetadata()
 
       // Update indices
-      await this.indexManager.updateIndex(this.name, docId, validatedDoc)
+      await this.indexManager.updateIndex(
+        this.name,
+        docId,
+        validatedDoc as DocumentWithId
+      )
 
-      return validatedDoc
-    } catch (error) {
+      return validatedDoc as DocumentWithId
+    } catch (error: any) {
       throw new DocuDBError(
         `Error inserting document: ${error.message}`,
         MCO_ERROR.DOCUMENT.INSERT_ERROR,
@@ -365,7 +413,7 @@ class Collection {
    * @param {Object[]} docs - Documents to insert
    * @returns {Promise<Object[]>} - Inserted documents with IDs
    */
-  async insertMany (docs) {
+  async insertMany (docs: Document[]): Promise<DocumentWithId[]> {
     try {
       if (!Array.isArray(docs)) {
         throw new DocuDBError(
@@ -382,7 +430,7 @@ class Collection {
       }
 
       return results
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error inserting documents: ${error.message}`,
         MCO_ERROR.DOCUMENT.INSERT_ERROR,
@@ -396,13 +444,16 @@ class Collection {
    * @param {string} id - Document ID
    * @returns {Promise<Object|null>} - Found document or null
    */
-  async findById (id) {
+  async findById (id: string): Promise<DocumentWithId | null> {
     try {
       // Check if we have a schema with custom ID validation
       let skipDefaultIdValidation = false
-      if (this.schema && this.schema.definition._id &&
-          this.schema.definition._id.validate &&
-          this.schema.definition._id.validate.pattern) {
+      if (
+        (this.schema != null) &&
+        this.schema.definition._id &&
+        (this.schema.definition._id.validate != null) &&
+        (this.schema.definition._id.validate.pattern != null)
+      ) {
         // If we have a schema with pattern validation for _id, we'll skip the default validation
         skipDefaultIdValidation = true
       }
@@ -444,8 +495,8 @@ class Collection {
         .filter(f => f.startsWith('chunk_'))
         .map(f => path.join(docDirPath, f))
         .sort((a, b) => {
-          const numA = parseInt(a.match(/chunk_(\d+)/)[1])
-          const numB = parseInt(b.match(/chunk_(\d+)/)[1])
+          const numA = parseInt(a.match(/chunk_(\d+)/)?.[1] ?? '0')
+          const numB = parseInt(b.match(/chunk_(\d+)/)?.[1] ?? '0')
           return numA - numB
         })
 
@@ -458,12 +509,13 @@ class Collection {
 
       // Update cache
       this.documents[id] = {
+        _id: id,
         data: doc,
         chunkPaths
       }
 
       return doc
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error finding document: ${error.message}`,
         MCO_ERROR.DOCUMENT.NOT_FOUND,
@@ -475,12 +527,11 @@ class Collection {
   /**
    * Finds documents matching criteria
    * @param {Object} criteria - Search criteria
-   * @returns {Promise<Object[]>} - Found documents
+   * @returns {Promise<Document[]>} - Found documents
    */
-  async find (criteria = {}) {
+  async find (criteria = {}): Promise<DocumentWithId[]> {
     try {
       const query = criteria instanceof Query ? criteria : new Query(criteria)
-
       // Try to use indices to optimize search
       const results = await this._findWithOptimization(query)
 
@@ -491,7 +542,7 @@ class Collection {
       // If optimization not possible, load all documents and filter
       const allDocs = await this._loadAllDocuments()
       return query.execute(allDocs)
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error in query: ${error.message}`,
         MCO_ERROR.DOCUMENT.QUERY_ERROR,
@@ -505,11 +556,11 @@ class Collection {
    * @param {Object} criteria - Search criteria
    * @returns {Promise<Object|null>} - Found document or null
    */
-  async findOne (criteria = {}) {
+  async findOne (criteria = {}): Promise<DocumentWithId | null> {
     try {
       const results = await this.find(criteria)
       return results.length > 0 ? results[0] : null
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error in query: ${error.message}`,
         MCO_ERROR.DOCUMENT.QUERY_ERROR,
@@ -522,15 +573,21 @@ class Collection {
    * Updates a document by its ID
    * @param {string} id - Document ID
    * @param {Object} update - Changes to apply
-   * @returns {Promise<Object|null>} - Updated document or null
+   * @returns {Promise<DocumentWithId|null>} - Updated document or null
    */
-  async updateById (id, update) {
+  async updateById (
+    id: string,
+    update: UpdateOperations
+  ): Promise<DocumentWithId | null> {
     try {
       // Check if we have a schema with custom ID validation
       let skipDefaultIdValidation = false
-      if (this.schema && this.schema.definition._id &&
-          this.schema.definition._id.validate &&
-          this.schema.definition._id.validate.pattern) {
+      if (
+        (this.schema != null) &&
+        this.schema.definition._id &&
+        (this.schema.definition._id.validate != null) &&
+        (this.schema.definition._id.validate.pattern != null)
+      ) {
         // If we have a schema with pattern validation for _id, we'll skip the default validation
         skipDefaultIdValidation = true
       }
@@ -554,7 +611,7 @@ class Collection {
 
       // Find document
       const doc = await this.findById(id)
-      if (!doc) {
+      if (doc == null) {
         return null
       }
 
@@ -584,22 +641,23 @@ class Collection {
       const updatedDoc = this._applyUpdate(doc, update)
 
       // Validate schema if exists
-      if (this.schema) {
+      if (this.schema != null) {
         this.schema.validate(updatedDoc)
       }
 
       // Implement locking mechanism for concurrent operations
       const lockKey = `${this.name}:${id}:lock`
-
       // Create global object for locks if it doesn't exist
-      if (!global._documentLocks) global._documentLocks = {}
+      if (!('_documentLocks' in global)) {
+        ;(global as any)._documentLocks = {} as DocumentLocks
+      }
 
       // Wait if document is locked (with retry)
       let retries = 0
       const maxRetries = 10
       const retryDelay = 50 // ms
 
-      while (global._documentLocks[lockKey] && retries < maxRetries) {
+      while ((global as any)._documentLocks[lockKey] && retries < maxRetries) {
         await new Promise(resolve =>
           setTimeout(resolve, retryDelay * (1 + Math.random()))
         )
@@ -607,7 +665,7 @@ class Collection {
       }
 
       // If still locked after several attempts, throw error
-      if (global._documentLocks[lockKey]) {
+      if ((global as any)._documentLocks[lockKey]) {
         throw new DocuDBError(
           `Document locked after ${maxRetries} attempts: ${id}`,
           MCO_ERROR.DOCUMENT.LOCK_ERROR
@@ -615,7 +673,7 @@ class Collection {
       }
 
       // Set lock
-      global._documentLocks[lockKey] = true
+      ;(global as any)._documentLocks[lockKey] = true
 
       try {
         // Save updated document
@@ -635,6 +693,7 @@ class Collection {
 
         // Update cache
         this.documents[id] = {
+          _id: id,
           data: updatedDoc,
           chunkPaths
         }
@@ -647,11 +706,11 @@ class Collection {
         await this.indexManager.updateIndex(this.name, id, updatedDoc)
       } finally {
         // Release lock
-        delete global._documentLocks[lockKey]
+        delete (global as any)._documentLocks[lockKey]
       }
 
       return updatedDoc
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error updating document: ${error.message}`,
         MCO_ERROR.DOCUMENT.UPDATE_ERROR,
@@ -666,7 +725,10 @@ class Collection {
    * @param {Object} update - Changes to apply
    * @returns {Promise<number>} - Number of documents updated
    */
-  async updateMany (criteria, update) {
+  async updateMany (
+    criteria: object,
+    update: UpdateOperations
+  ): Promise<number> {
     try {
       // Find matching documents
       const docs = await this.find(criteria)
@@ -675,11 +737,11 @@ class Collection {
       // Update each document
       for (const doc of docs) {
         const result = await this.updateById(doc._id, update)
-        if (result) count++
+        if (result != null) count++
       }
 
       return count
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error updating documents: ${error.message}`,
         MCO_ERROR.DOCUMENT.UPDATE_ERROR,
@@ -693,13 +755,16 @@ class Collection {
    * @param {string} id - Document ID
    * @returns {Promise<boolean>} - true if successfully deleted
    */
-  async deleteById (id) {
+  async deleteById (id: string): Promise<boolean> {
     try {
       // Check if we have a schema with custom ID validation
       let skipDefaultIdValidation = false
-      if (this.schema && this.schema.definition._id &&
-          this.schema.definition._id.validate &&
-          this.schema.definition._id.validate.pattern) {
+      if (
+        (this.schema != null) &&
+        this.schema.definition._id &&
+        (this.schema.definition._id.validate != null) &&
+        (this.schema.definition._id.validate.pattern != null)
+      ) {
         // If we have a schema with pattern validation for _id, we'll skip the default validation
         skipDefaultIdValidation = true
       }
@@ -722,7 +787,7 @@ class Collection {
       }
 
       // Check if exists
-      if (!(await this.findById(id))) {
+      if ((await this.findById(id)) == null) {
         return false
       }
 
@@ -760,7 +825,7 @@ class Collection {
       await this._saveMetadata()
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error deleting document: ${error.message}`,
         MCO_ERROR.DOCUMENT.DELETE_ERROR,
@@ -774,7 +839,7 @@ class Collection {
    * @param {Object} criteria - Search criteria
    * @returns {Promise<number>} - Number of documents deleted
    */
-  async deleteMany (criteria) {
+  async deleteMany (criteria: object): Promise<number> {
     try {
       // Find matching documents
       const docs = await this.find(criteria)
@@ -787,7 +852,7 @@ class Collection {
       }
 
       return count
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error deleting documents: ${error.message}`,
         MCO_ERROR.DOCUMENT.DELETE_ERROR,
@@ -801,7 +866,7 @@ class Collection {
    * @param {Object} criteria - Search criteria
    * @returns {Promise<number>} - Number of documents
    */
-  async count (criteria = {}) {
+  async count (criteria = {}): Promise<number> {
     try {
       if (Object.keys(criteria).length === 0) {
         // If no criteria, return metadata counter
@@ -811,7 +876,7 @@ class Collection {
       // If criteria exists, count matching documents
       const docs = await this.find(criteria)
       return docs.length
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error counting documents: ${error.message}`,
         MCO_ERROR.DOCUMENT.QUERY_ERROR,
@@ -826,7 +891,10 @@ class Collection {
    * @param {Object} options - Index options
    * @returns {Promise<boolean>} - true if successfully created
    */
-  async createIndex (field, options = {}) {
+  async createIndex (
+    field: string | string[],
+    options: object = {}
+  ): Promise<boolean> {
     try {
       // Create index
       await this.indexManager.createIndex(this.name, field, options)
@@ -845,7 +913,7 @@ class Collection {
       }
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error creating index: ${error.message}`,
         MCO_ERROR.INDEX.CREATE_ERROR,
@@ -856,9 +924,9 @@ class Collection {
 
   /**
    * List all the indices in the collection
-   * @returns {Promise<Array>} - List of indices
+   * @returns {Promise<IndexOptions[]>} - List of indices
    */
-  async listIndexes () {
+  async listIndexes (): Promise<IndexOptions[]> {
     try {
       const indices = []
       for (const key in this.indexManager.indices) {
@@ -874,7 +942,7 @@ class Collection {
         }
       }
       return indices
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error listing indexes: ${error.message}`,
         MCO_ERROR.INDEX.CREATE_ERROR,
@@ -888,7 +956,7 @@ class Collection {
    * @param {string} field - Indexed field
    * @returns {Promise<boolean>} - true if successfully dropped
    */
-  async dropIndex (field) {
+  async dropIndex (field: string): Promise<boolean> {
     try {
       await this.indexManager.dropIndex(this.name, field)
 
@@ -899,7 +967,7 @@ class Collection {
       await this._saveMetadata()
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error deleting index: ${error.message}`,
         MCO_ERROR.INDEX.DROP_ERROR,
@@ -913,7 +981,7 @@ class Collection {
    * @param {string} id - Document ID
    * @returns {Promise<number>} - Index of the document or -1 if not found
    */
-  async getPosition (id) {
+  async getPosition (id: string): Promise<number> {
     try {
       if (!id || typeof id !== 'string') {
         throw new DocuDBError('Invalid ID', MCO_ERROR.DOCUMENT.INVALID_DOCUMENT)
@@ -930,7 +998,7 @@ class Collection {
 
       // Check if document exists
       const doc = await this.findById(id)
-      if (!doc) {
+      if (doc == null) {
         return -1
       }
 
@@ -941,7 +1009,7 @@ class Collection {
       const index = allDocs.findIndex(doc => doc._id === id)
 
       return index
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error finding document index: ${error.message}`,
         MCO_ERROR.DOCUMENT.QUERY_ERROR,
@@ -952,14 +1020,14 @@ class Collection {
 
   /**
    * Finds a document by its index in the collection
-   * @param {number} index - Index of the document in the collection
+   * @param {number} position - Index of the document in the collection
    * @returns {Promise<Object|null>} - Document at the specified index or null if not found
    */
-  async findByPosition (index) {
+  async findByPosition (position: number): Promise<DocumentWithId | null> {
     try {
-      if (typeof index !== 'number' || index < 0) {
+      if (typeof position !== 'number' || position < 0) {
         throw new DocuDBError(
-          'Invalid index: must be a non-negative number',
+          'Invalid Position: must be a non-negative number',
           MCO_ERROR.DOCUMENT.INVALID_DOCUMENT
         )
       }
@@ -968,17 +1036,17 @@ class Collection {
       const allDocs = await this._loadAllDocuments()
 
       // Check if index is within bounds
-      if (index >= allDocs.length) {
+      if (position >= allDocs.length) {
         return null
       }
 
       // Return the document at the specified index
-      return allDocs[index]
-    } catch (error) {
+      return allDocs[position]
+    } catch (error: any) {
       throw new DocuDBError(
         `Error finding document by index: ${error.message}`,
         MCO_ERROR.DOCUMENT.QUERY_ERROR,
-        { collectionName: this.name, index, originalError: error }
+        { collectionName: this.name, index: position, originalError: error }
       )
     }
   }
@@ -989,7 +1057,7 @@ class Collection {
    * @param {number} newIndex - New index position for the document
    * @returns {Promise<boolean>} - true if successfully updated, false if document not found
    */
-  async updatePosition (id, newIndex) {
+  async updatePosition (id: string, newIndex: number): Promise<boolean> {
     try {
       if (!id || typeof id !== 'string') {
         throw new DocuDBError('Invalid ID', MCO_ERROR.DOCUMENT.INVALID_DOCUMENT)
@@ -1004,7 +1072,7 @@ class Collection {
 
       // Find the document
       const doc = await this.findById(id)
-      if (!doc) {
+      if (doc == null) {
         return false
       }
 
@@ -1043,7 +1111,7 @@ class Collection {
       }
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error updating document index: ${error.message}`,
         MCO_ERROR.DOCUMENT.UPDATE_ERROR,
@@ -1071,7 +1139,7 @@ class Collection {
 
       this.documents = {}
       this.metadata.count = 0
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error deleting collection: ${error.message}`,
         MCO_ERROR.COLLECTION.DROP_ERROR,
@@ -1092,7 +1160,7 @@ class Collection {
       } else {
         await this._saveMetadata()
       }
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error loading metadata: ${error.message}`,
         MCO_ERROR.COLLECTION.METADATA_ERROR,
@@ -1111,7 +1179,7 @@ class Collection {
         this.metadataPath,
         JSON.stringify(this.metadata, null, 2)
       )
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error saving metadata: ${error.message}`,
         MCO_ERROR.COLLECTION.METADATA_ERROR,
@@ -1125,7 +1193,7 @@ class Collection {
    * @returns {string} - Generated ID
    * @private
    */
-  _generateId () {
+  _generateId (): string {
     // Check if UUID format is specified in options
     if (this.options.idType === 'uuid') {
       // Use crypto.randomUUID() for UUID v4 generation
@@ -1142,29 +1210,29 @@ class Collection {
    * @returns {Object} - Updated document
    * @private
    */
-  _applyUpdate (doc, update) {
+  _applyUpdate (doc: DocumentWithId, update: UpdateOperations): DocumentWithId {
     const result = deepCopy(doc)
 
-    if (!update.$set && !update.$unset && !update.$inc) {
+    if (update.$set == null && update.$unset == null && update.$inc == null) {
       const id = result._id
       Object.assign(result, update)
       result._id = id
       return result
     }
 
-    if (update.$set) {
+    if (update.$set != null) {
       for (const [key, value] of Object.entries(update.$set)) {
         this._setNestedValue(result, key, value)
       }
     }
 
-    if (update.$unset) {
+    if (update.$unset != null) {
       for (const key of Object.keys(update.$unset)) {
         this._unsetNestedValue(result, key)
       }
     }
 
-    if (update.$inc) {
+    if (update.$inc != null) {
       for (const [key, value] of Object.entries(update.$inc)) {
         const currentValue = this._getNestedValue(result, key) || 0
         if (typeof currentValue !== 'number') {
@@ -1188,7 +1256,7 @@ class Collection {
    * @param {*} value - Value to set
    * @private
    */
-  _setNestedValue (obj, path, value) {
+  _setNestedValue (obj: any, path: string, value: any) {
     const parts = path.split('.')
     let current = obj
 
@@ -1211,7 +1279,7 @@ class Collection {
    * @param {string} path - Path to the value using dot notation
    * @private
    */
-  _unsetNestedValue (obj, path) {
+  _unsetNestedValue (obj: any, path: string) {
     const parts = path.split('.')
     let current = obj
 
@@ -1233,7 +1301,7 @@ class Collection {
    * @returns {*} - Found or undefined value
    * @private
    */
-  _getNestedValue (obj, path) {
+  _getNestedValue (obj: any, path: string): any {
     const parts = path.split('.')
     let current = obj
 
@@ -1253,24 +1321,24 @@ class Collection {
 
   /**
    * Loads all documents in the collection
-   * @returns {Promise<Object[]>} - All documents
+   * @returns {Promise<DocumentWithId[]>} - All documents
    * @private
    */
-  async _loadAllDocuments () {
+  async _loadAllDocuments (): Promise<DocumentWithId[]> {
     try {
       const collectionDir = path.join(this.storage.dataDir, this.name)
       const items = await promisify(fs.readdir)(collectionDir, {
         withFileTypes: true
       })
-      const docs = []
-      const documentMap = {}
+      const docs: DocumentWithId[] = []
+      const documentMap: Record<string, DocumentWithId> = {}
 
       // First load all documents into a map
       for (const item of items) {
         if (item.isDirectory() && !item.name.startsWith('_')) {
           const docId = item.name
-          const doc = await this.findById(docId)
-          if (doc) {
+          const doc: DocumentWithId | null = await this.findById(docId)
+          if (doc != null) {
             documentMap[docId] = doc
           }
         }
@@ -1301,7 +1369,7 @@ class Collection {
       }
 
       return docs
-    } catch (error) {
+    } catch (error: any) {
       throw new DocuDBError(
         `Error uploading documents: ${error.message}`,
         MCO_ERROR.DOCUMENT.NOT_FOUND,
@@ -1313,21 +1381,21 @@ class Collection {
   /**
    * Attempts to optimize a query using indexes
    * @param {Query} query - Query to optimize
-   * @returns {Promise<Object[]|null>} - Results or null if the optimization failed
+   * @returns {Promise<DocumentWithId[]|null>} - Results or null if the optimization failed
    * @private
    */
-  async _findWithOptimization (query) {
+  async _findWithOptimization (query: Query): Promise<DocumentWithId[] | null> {
     for (const field in query.criteria) {
       if (this.indexManager.hasIndex(this.name, field)) {
         const value = query.criteria[field]
 
         if (typeof value !== 'object' || value === null) {
           const docIds = this.indexManager.findByIndex(this.name, field, value)
-          if (docIds && docIds.length > 0) {
+          if (docIds != null && docIds.length > 0) {
             const docs = []
             for (const id of docIds) {
               const doc = await this.findById(id)
-              if (doc && query.matches(doc)) {
+              if (doc != null && query.matches(doc)) {
                 docs.push(doc)
               }
             }

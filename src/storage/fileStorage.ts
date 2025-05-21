@@ -10,6 +10,7 @@ import { promisify } from 'node:util'
 import gzip from '../compression/gzip.js'
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 import { fileExists } from '../utils/fileUtils.js'
+import { DocumentWithId, StorageOptions } from '../types/index.js'
 
 // Convert callback functions to promises
 const readFilePromise = promisify(fs.readFile)
@@ -18,16 +19,23 @@ const mkdirPromise = promisify(fs.mkdir)
 const rmPromise = promisify(fs.rm)
 
 class FileStorage {
+  /** Directory to store data */
+  public dataDir: string
+  /** Maximum size of each chunk in bytes */
+  public chunkSize: number
+  /** Indicates if compression should be used */
+  public useCompression: boolean
+  /** File extension for chunks */
+  public chunkExt: string
+
   /**
-   * @param {Object} options - Configuration options
-   * @param {string} options.dataDir - Directory to store data
-   * @param {number} options.chunkSize - Maximum size of each chunk in bytes
-   * @param {boolean} options.compression - Indicates if compression should be used
+   * Creates a new file storage instance
+   * @param options - Configuration options
    */
-  constructor (options = {}) {
+  constructor (options: StorageOptions) {
     this.dataDir = options.dataDir || './data'
     this.chunkSize = options.chunkSize || 1024 * 1024 // 1MB default
-    this.useCompression = options.compression !== false
+    this.useCompression = options.compression
     this.chunkExt = this.useCompression ? '.gz' : '.json'
   }
 
@@ -40,9 +48,31 @@ class FileStorage {
       if (!exists) {
         await mkdirPromise(this.dataDir, { recursive: true })
       }
-    } catch (error) {
-      throw new DocuDBError(`Error initializing storage: ${error.message}`, MCO_ERROR.STORAGE.INIT_ERROR, { originalError: error })
+    } catch (error: any) {
+      throw new DocuDBError(
+        `Error initializing storage: ${error.message}`,
+        MCO_ERROR.STORAGE.INIT_ERROR,
+        { originalError: error }
+      )
     }
+  }
+
+  /**
+   * Splits data into appropriately sized chunks
+   * @param {string} data - Data to split
+   * @returns {string[]} - Array of chunks
+   * @private
+   */
+  _splitIntoChunks (data: string): string[] {
+    const chunks = []
+    let offset = 0
+
+    while (offset < data.length) {
+      chunks.push(data.slice(offset, offset + this.chunkSize))
+      offset += this.chunkSize
+    }
+
+    return chunks
   }
 
   /**
@@ -51,7 +81,7 @@ class FileStorage {
    * @param {Object} data - Data to save
    * @returns {Promise<string[]>} - List of created chunk paths
    */
-  async saveData (collectionName, data) {
+  async saveData (collectionName: string, data: Object): Promise<string[]> {
     try {
       await this._ensureCollectionDir(collectionName)
 
@@ -61,7 +91,7 @@ class FileStorage {
 
       for (let i = 0; i < chunks.length; i++) {
         const chunkPath = this._getChunkPath(collectionName, i)
-        let chunkData = chunks[i]
+        let chunkData: Buffer | string = chunks[i]
 
         if (this.useCompression) {
           chunkData = await gzip.compress(chunkData)
@@ -72,23 +102,26 @@ class FileStorage {
       }
 
       return chunkPaths
-    } catch (error) {
-      throw new DocuDBError(`Error saving data: ${error.message}`, MCO_ERROR.STORAGE.SAVE_ERROR, { collectionName, originalError: error })
+    } catch (error: any) {
+      throw new DocuDBError(
+        `Error saving data: ${error.message}`,
+        MCO_ERROR.STORAGE.SAVE_ERROR,
+        { collectionName, originalError: error }
+      )
     }
   }
 
   /**
    * Reads data from a set of chunks
    * @param {string[]} chunkPaths - Paths of chunks to read
-   * @returns {Promise<Object>} - Combined data
+   * @returns {Promise<DocumentWithId>} - Combined data
    */
-  async readData (chunkPaths) {
+  async readData (chunkPaths: string[]): Promise<DocumentWithId> {
     try {
       let combinedData = ''
 
       for (const chunkPath of chunkPaths) {
-        let chunkData = await readFilePromise(chunkPath)
-
+        let chunkData: Buffer = await readFilePromise(chunkPath)
         if (this.useCompression) {
           chunkData = await gzip.decompress(chunkData)
         }
@@ -97,8 +130,12 @@ class FileStorage {
       }
 
       return JSON.parse(combinedData)
-    } catch (error) {
-      throw new DocuDBError(`Error reading data: ${error.message}`, MCO_ERROR.STORAGE.READ_ERROR, { chunkPaths, originalError: error })
+    } catch (error: any) {
+      throw new DocuDBError(
+        `Error reading data: ${error.message}`,
+        MCO_ERROR.STORAGE.READ_ERROR,
+        { chunkPaths, originalError: error }
+      )
     }
   }
 
@@ -106,7 +143,7 @@ class FileStorage {
    * Deletes a set of chunks
    * @param {string[]} chunkPaths - Paths of chunks to delete
    */
-  async deleteChunks (chunkPaths) {
+  async deleteChunks (chunkPaths: string[]) {
     try {
       for (const chunkPath of chunkPaths) {
         const exists = await fileExists(chunkPath)
@@ -115,8 +152,12 @@ class FileStorage {
           await rmPromise(chunkPath, { recursive: true, force: true })
         }
       }
-    } catch (error) {
-      throw new DocuDBError(`Error deleting chunks: ${error.message}`, MCO_ERROR.STORAGE.DELETE_ERROR, { chunkPaths, originalError: error })
+    } catch (error: any) {
+      throw new DocuDBError(
+        `Error deleting chunks: ${error.message}`,
+        MCO_ERROR.STORAGE.DELETE_ERROR,
+        { chunkPaths, originalError: error }
+      )
     }
   }
 
@@ -125,7 +166,7 @@ class FileStorage {
    * @param {string} collectionName - Collection name
    * @private
    */
-  async _ensureCollectionDir (collectionName) {
+  async _ensureCollectionDir (collectionName: string) {
     const collectionDir = path.join(this.dataDir, collectionName)
     const exists = await fileExists(collectionDir)
     if (!exists) {
@@ -141,31 +182,13 @@ class FileStorage {
   }
 
   /**
-   * Splits data into appropriately sized chunks
-   * @param {string} data - Data to split
-   * @returns {string[]} - Array of chunks
-   * @private
-   */
-  _splitIntoChunks (data) {
-    const chunks = []
-    let offset = 0
-
-    while (offset < data.length) {
-      chunks.push(data.slice(offset, offset + this.chunkSize))
-      offset += this.chunkSize
-    }
-
-    return chunks
-  }
-
-  /**
    * Generates the path for a chunk
    * @param {string} collectionName - Collection name
    * @param {number} chunkIndex - Chunk index
    * @returns {string} - Chunk path
    * @private
    */
-  _getChunkPath (collectionName, chunkIndex) {
+  _getChunkPath (collectionName: string, chunkIndex: number) {
     return path.join(
       this.dataDir,
       collectionName,

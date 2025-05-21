@@ -4,13 +4,32 @@
  */
 
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
+import {
+  QueryCriteria,
+  SortOptions,
+  SelectFields,
+  Document,
+  Query as QueryInterface,
+  DocumentWithId
+} from '../types/index.js'
 
-class Query {
+class Query implements QueryInterface {
+  /** Query criteria */
+  public criteria: QueryCriteria
+  /** Sort options */
+  public sortOptions: SortOptions | null
+  /** Limit value */
+  public limitValue: number | null
+  /** Skip value */
+  public skipValue: number
+  /** Fields to select */
+  public selectFields: SelectFields | null
+
   /**
-   * Creates a new query
-   * @param {Object} criteria - Search criteria
+   * Creates a new query for filtering documents
+   * @param criteria - Search criteria using MongoDB-like query syntax
    */
-  constructor (criteria = {}) {
+  constructor (criteria: QueryCriteria = {}) {
     this.criteria = criteria
     this.sortOptions = null
     this.limitValue = null
@@ -20,51 +39,51 @@ class Query {
 
   /**
    * Evaluates if a document matches the query criteria
-   * @param {Object} doc - Document to evaluate
-   * @returns {boolean} - true if the document matches the criteria
+   * @param doc - Document to evaluate
+   * @returns true if the document matches the criteria
    */
-  matches (doc) {
+  matches (doc: Document): boolean {
     return this._evaluateCriteria(doc, this.criteria)
   }
 
   /**
    * Sorts results by specified fields
-   * @param {Object} sortBy - Fields and sort direction (1 ascending, -1 descending)
-   * @returns {Query} - Current instance for chaining
+   * @param sortBy - Fields and sort direction (1 ascending, -1 descending)
+   * @returns Current instance for chaining
    */
-  sort (sortBy) {
+  sort (sortBy: SortOptions): Query {
     this.sortOptions = sortBy
     return this
   }
 
   /**
    * Limits the number of results
-   * @param {number} n - Maximum number of results
-   * @returns {Query} - Current instance for chaining
+   * @param n - Maximum number of results
+   * @returns Current instance for chaining
    */
-  limit (n) {
+  limit (n: number): Query {
     this.limitValue = n
     return this
   }
 
   /**
    * Skips a number of results
-   * @param {number} n - Number of results to skip
-   * @returns {Query} - Current instance for chaining
+   * @param n - Number of results to skip
+   * @returns Current instance for chaining
    */
-  skip (n) {
+  skip (n: number): Query {
     this.skipValue = n
     return this
   }
 
   /**
    * Selects specific fields to include in the results
-   * @param {Object|Array} fields - Fields to include
-   * @returns {Query} - Current instance for chaining
+   * @param fields - Fields to include
+   * @returns Current instance for chaining
    */
-  select (fields) {
+  select (fields: SelectFields): Query {
     if (Array.isArray(fields)) {
-      const selectObj = {}
+      const selectObj: SelectFields = {}
       fields.forEach(field => (selectObj[field] = 1))
       this.selectFields = selectObj
     } else {
@@ -75,10 +94,10 @@ class Query {
 
   /**
    * Applies the query to a collection of documents
-   * @param {Array} documents - Documents to filter
-   * @returns {Array} - Documents that match the criteria
+   * @param documents - Documents to filter
+   * @returns Documents that match the criteria
    */
-  execute (documents) {
+  execute (documents: Document[]): DocumentWithId[] {
     // Filter documents according to criteria
     let results = []
 
@@ -87,7 +106,7 @@ class Query {
     results = documents.filter(doc => this.matches(doc))
 
     // Apply sorting if defined
-    if (this.sortOptions) {
+    if (this.sortOptions != null) {
       results = this._applySorting(results)
     }
 
@@ -102,11 +121,11 @@ class Query {
     }
 
     // Apply field projection
-    if (this.selectFields) {
+    if (this.selectFields != null) {
       results = this._applyProjection(results)
     }
 
-    return results
+    return results as DocumentWithId[]
   }
 
   /**
@@ -116,7 +135,7 @@ class Query {
    * @returns {boolean} - true if the document matches the criteria
    * @private
    */
-  _evaluateCriteria (doc, criteria) {
+  _evaluateCriteria (doc: Document, criteria: QueryCriteria) {
     // If criteria is null or undefined, always matches
     if (criteria == null) return true
 
@@ -181,7 +200,7 @@ class Query {
    * @returns {boolean} - true if the operator condition is met
    * @private
    */
-  _evaluateOperator (operator, docValue, criteriaValue) {
+  _evaluateOperator (operator: string, docValue: any, criteriaValue: any) {
     switch (operator) {
       case '$eq':
         return this._equals(docValue, criteriaValue)
@@ -248,7 +267,7 @@ class Query {
    * @returns {boolean} - true if values are equal
    * @private
    */
-  _equals (a, b) {
+  _equals (a: any, b: any): boolean {
     if (a === b) return true
 
     // Date comparison
@@ -283,7 +302,7 @@ class Query {
    * @returns {*} - Found value or undefined
    * @private
    */
-  _getNestedValue (obj, path) {
+  _getNestedValue (obj: Document, path: string) {
     if (!obj || !path) return undefined
 
     const parts = path.split('.')
@@ -303,13 +322,16 @@ class Query {
    * @returns {Array} - Sorted results
    * @private
    */
-  _applySorting (results) {
+  _applySorting (results: Document[]) {
+    if (this.sortOptions == null) return results
+
     return [...results].sort((a, b) => {
-      for (const [field, direction] of Object.entries(this.sortOptions)) {
+      for (const [field, direction] of Object.entries(this.sortOptions as Record<string, 1 | -1>)) {
         const valueA = this._getNestedValue(a, field)
         const valueB = this._getNestedValue(b, field)
 
         // Compare values
+        if (valueA === undefined || valueB === undefined) return 0
         if (valueA < valueB) return -1 * direction
         if (valueA > valueB) return 1 * direction
       }
@@ -323,11 +345,11 @@ class Query {
    * @returns {Array} - Results with projection applied
    * @private
    */
-  _applyProjection (results) {
+  _applyProjection (results: Document[]) {
     return results.map(doc => {
-      const projected = {}
+      const projected: Document = {}
 
-      for (const [field, include] of Object.entries(this.selectFields)) {
+      for (const [field, include] of Object.entries(this.selectFields as Record<string, 1 | -1>)) {
         if (include) {
           const value = this._getNestedValue(doc, field)
           if (value !== undefined) {

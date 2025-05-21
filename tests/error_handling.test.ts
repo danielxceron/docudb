@@ -1,21 +1,17 @@
 import { Database, Schema } from '../index.js'
 import { expect } from 'chai'
-import fs from 'node:fs'
-import path from 'node:path'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { Collection } from '../src/core/database.js'
+
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - Error Handling', () => {
-  let db
-  const testDbName = 'testErrores'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
+  let db: Database
+  const testDbName = 'testErrors'
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
+
     db = new Database({
       name: testDbName,
       compression: false
@@ -24,9 +20,7 @@ describe('DocuDB - Error Handling', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Initialization Errors', () => {
@@ -39,7 +33,7 @@ describe('DocuDB - Error Handling', () => {
       try {
         await invalidDb.initialize()
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Error initializing')
       }
     })
@@ -50,21 +44,21 @@ describe('DocuDB - Error Handling', () => {
       try {
         db.collection('')
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Collection name')
       }
 
       try {
-        db.collection(null)
+        db.collection(null as any)
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Collection name')
       }
 
       try {
-        db.collection(123)
+        db.collection(123 as any)
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Collection name')
       }
     })
@@ -76,7 +70,7 @@ describe('DocuDB - Error Handling', () => {
   })
 
   describe('Schema Validation Errors', () => {
-    let productos
+    let productos: Collection
 
     beforeEach(() => {
       const productoSchema = new Schema({
@@ -96,7 +90,7 @@ describe('DocuDB - Error Handling', () => {
       try {
         await productos.insertOne({ price: 100 }) // Missing name
         expect.fail('Should have thrown a validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('required')
       }
     })
@@ -108,7 +102,7 @@ describe('DocuDB - Error Handling', () => {
           price: 'hundred' // Should be a number
         })
         expect.fail('Should have thrown a validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('type')
       }
     })
@@ -120,7 +114,7 @@ describe('DocuDB - Error Handling', () => {
           price: -10 // Should be >= 0
         })
         expect.fail('Should have thrown a validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('greater than or equal to 0')
       }
     })
@@ -133,14 +127,14 @@ describe('DocuDB - Error Handling', () => {
           invalidField: 'value' // Not in schema
         })
         expect.fail('Should have thrown a validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('allowed')
       }
     })
   })
 
   describe('CRUD Operation Errors', () => {
-    let productos
+    let productos: Collection
 
     beforeEach(async () => {
       productos = db.collection('productos')
@@ -148,27 +142,27 @@ describe('DocuDB - Error Handling', () => {
 
     it('should handle errors when searching with invalid ID', async () => {
       try {
-        await productos.findById('id-no-valido')
+        await productos.findById('id-no-valido' as any)
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Invalid document ID format')
       }
     })
 
     it('should handle errors when updating with invalid ID', async () => {
       try {
-        await productos.updateById('id-no-valido', { $set: { campo: 'valor' } })
+        await productos.updateById('id-no-valido' as any, { $set: { campo: 'valor' } })
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Invalid document ID format')
       }
     })
 
     it('should handle errors when deleting with invalid ID', async () => {
       try {
-        await productos.deleteById('id-no-valido')
+        await productos.deleteById('id-no-valido' as any)
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Invalid document ID format')
       }
     })
@@ -178,7 +172,7 @@ describe('DocuDB - Error Handling', () => {
       try {
         // Just testing validation, not actual operation
         await productos.findById(validMongoId)
-      } catch (error) {
+      } catch (error: any) {
         // Should fail with NOT_FOUND, not INVALID_ID
         expect(error.message).to.not.include('Invalid document ID format')
       }
@@ -189,7 +183,7 @@ describe('DocuDB - Error Handling', () => {
       try {
         // Just testing validation, not actual operation
         await productos.findById(validUuid)
-      } catch (error) {
+      } catch (error: any) {
         // Should fail with NOT_FOUND, not INVALID_ID
         expect(error.message).to.not.include('Invalid document ID format')
       }
@@ -202,7 +196,7 @@ describe('DocuDB - Error Handling', () => {
       try {
         await productos.updateById(doc._id, { $operadorInvalido: { campo: 'nuevo' } })
         expect.fail('Should have thrown an error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('operator')
       }
     })

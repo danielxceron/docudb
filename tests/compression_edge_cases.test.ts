@@ -1,24 +1,18 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { Database, Schema, Query } from '../index.js'
 import { expect } from 'chai'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { Collection } from '../src/core/database.js'
+
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - Compression and Edge Cases', () => {
   let db
-  let productos
+  let productos: Collection
   const testDbName = 'testCompression'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   describe('Data Compression', () => {
     beforeEach(async () => {
-      if (fs.existsSync(testDataDir)) {
-        fs.rmSync(testDataDir, { recursive: true })
-      }
+      await cleanTestDataDir(testDbName)
 
       db = new Database({
         name: testDbName,
@@ -38,15 +32,13 @@ describe('DocuDB - Compression and Edge Cases', () => {
     })
 
     afterEach(async () => {
-      if (fs.existsSync(testDataDir)) {
-        fs.rmSync(testDataDir, { recursive: true })
-      }
+      await cleanTestDataDir(testDbName)
     })
 
     it('should compress large documents correctly', async () => {
       // Create a document with large data
       const longDescription = 'a'.repeat(1000) // 1KB of text
-      const largeDetails = {}
+      const largeDetails: Record<string, string> = {}
 
       // Generate large object
       for (let i = 0; i < 100; i++) {
@@ -64,8 +56,11 @@ describe('DocuDB - Compression and Edge Cases', () => {
 
       // Retrieve the document
       const retrieved = await productos.findById(product._id)
-      expect(retrieved.description).to.equal(longDescription)
-      expect(Object.keys(retrieved.details)).to.have.lengthOf(100)
+      expect(retrieved).to.exist
+      if (retrieved != null) {
+        expect(retrieved.description).to.equal(longDescription)
+        expect(Object.keys(retrieved.details)).to.have.lengthOf(100)
+      }
     })
 
     it('should compress and decompress multiple documents correctly', async () => {
@@ -95,8 +90,10 @@ describe('DocuDB - Compression and Edge Cases', () => {
       for (let i = 0; i < 50; i++) {
         const doc = retrieved.find(d => d.name === `Product ${i}`)
         expect(doc).to.exist
-        expect(doc.price).to.equal(i * 10.5)
-        expect(doc.details.weight).to.equal(`${i * 100}g`)
+        if (doc != null) {
+          expect(doc.price).to.equal(i * 10.5)
+          expect(doc.details.weight).to.equal(`${i * 100}g`)
+        }
       }
     })
 
@@ -110,7 +107,7 @@ describe('DocuDB - Compression and Edge Cases', () => {
 
       // Update with large data
       const longDescription = 'New extended description '.repeat(100)
-      const largeDetails = {}
+      const largeDetails: Record<string, string> = {}
       for (let i = 0; i < 50; i++) {
         largeDetails[`attribute${i}`] = `value${i}`.repeat(5)
       }
@@ -122,20 +119,21 @@ describe('DocuDB - Compression and Edge Cases', () => {
         }
       })
 
-      expect(updated.description).to.equal(longDescription)
+      expect(updated?.description).to.equal(longDescription)
 
       // Retrieve and verify
       const retrieved = await productos.findById(product._id)
-      expect(retrieved.description).to.equal(longDescription)
-      expect(Object.keys(retrieved.details)).to.have.lengthOf(50)
+      expect(retrieved).to.exist
+      if (retrieved != null) {
+        expect(retrieved.description).to.equal(longDescription)
+        expect(Object.keys(retrieved.details)).to.have.lengthOf(50)
+      }
     })
   })
 
   describe('Edge Cases', () => {
     beforeEach(async () => {
-      if (fs.existsSync(testDataDir)) {
-        fs.rmSync(testDataDir, { recursive: true })
-      }
+      await cleanTestDataDir(testDbName)
 
       db = new Database({
         name: testDbName,
@@ -158,9 +156,7 @@ describe('DocuDB - Compression and Edge Cases', () => {
     })
 
     afterEach(async () => {
-      if (fs.existsSync(testDataDir)) {
-        fs.rmSync(testDataDir, { recursive: true })
-      }
+      await cleanTestDataDir(testDbName)
     })
 
     it('should handle empty documents correctly', async () => {
@@ -175,7 +171,10 @@ describe('DocuDB - Compression and Edge Cases', () => {
 
       // Retrieve
       const retrieved = await productos.findById(minimalProduct._id)
-      expect(retrieved.name).to.equal('Minimal Product')
+      expect(retrieved).to.exist
+      if (retrieved != null) {
+        expect(retrieved.name).to.equal('Minimal Product')
+      }
     })
 
     it('should handle empty arrays and objects', async () => {
@@ -196,9 +195,11 @@ describe('DocuDB - Compression and Edge Cases', () => {
           metadata: { color: 'red' }
         }
       })
-
-      expect(updated.tags).to.have.lengthOf(2)
-      expect(updated.metadata.color).to.equal('red')
+      expect(updated).to.exist
+      if (updated != null) {
+        expect(updated.tags).to.have.lengthOf(2)
+        expect(updated.metadata.color).to.equal('red')
+      }
     })
 
     it('should handle queries with complex filters', async () => {
@@ -274,12 +275,15 @@ describe('DocuDB - Compression and Edge Cases', () => {
 
       // Retrieve and verify
       const retrieved = await productos.findById(extremeProduct._id)
-      expect(retrieved.price).to.equal(Number.MAX_SAFE_INTEGER)
-      expect(retrieved.stock).to.equal(0) // -0 converts to 0
-      expect(retrieved.tags).to.have.lengthOf(1000)
-      expect(retrieved.metadata.nested.deeply.value).to.equal(
-        Number.MIN_SAFE_INTEGER
-      )
+      expect(retrieved).to.exist
+      if (retrieved != null) {
+        expect(retrieved.price).to.equal(Number.MAX_SAFE_INTEGER)
+        expect(retrieved.stock).to.equal(0) // -0 converts to 0
+        expect(retrieved.tags).to.have.lengthOf(1000)
+        expect(retrieved.metadata.nested.deeply.value).to.equal(
+          Number.MIN_SAFE_INTEGER
+        )
+      }
     })
   })
 })

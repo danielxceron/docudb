@@ -1,26 +1,17 @@
-import { Database } from '../index.js'
+import { Database, DocuDBError, MCO_ERROR } from '../index.js'
 import { expect } from 'chai'
-import fs from 'node:fs'
-import path from 'node:path'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - Concurrency and Data Integrity', () => {
   const testDbName = 'testConcurrency'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Data Integrity After Restarts', () => {
@@ -47,7 +38,7 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
       expect(initialCount).to.equal(3)
 
       // Close database (simulating restart)
-      db = null
+      db = null as any
 
       // Restart database
       db = new Database({
@@ -88,7 +79,7 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
       ])
 
       // Close database (simulating restart)
-      db = null
+      db = null as any
 
       // Restart database
       db = new Database({
@@ -106,8 +97,9 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
           name: 'Product C',
           code: 'A001' // Duplicate code
         })
+
         expect.fail('Should have thrown a duplicate error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Duplicate')
       }
     })
@@ -167,7 +159,7 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
       })
 
       // Perform multiple concurrent increments
-      let promise = Promise.resolve()
+      let promise: Promise<any> = Promise.resolve()
       const operationPromises = []
       const numOperations = 20
 
@@ -175,9 +167,13 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
         promise = promise.then(async () => {
           // Get current value and increment it in a single atomic operation
           const current = await counters.findById(counter._id)
-          return counters.updateById(counter._id, {
-            $set: { value: current.value + 1 }
-          })
+          if (current != null) {
+            return await counters.updateById(counter._id, {
+              $set: { value: current.value + 1 }
+            })
+          } else {
+            throw new DocuDBError('Counter not found', MCO_ERROR.DOCUMENT.NOT_FOUND)
+          }
         })
         operationPromises.push(promise)
       }
@@ -187,7 +183,10 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
 
       // Verify final value
       const finalCounter = await counters.findById(counter._id)
-      expect(finalCounter.value).to.equal(numOperations)
+      expect(finalCounter).to.exist
+      if (finalCounter != null) {
+        expect(finalCounter.value).to.equal(numOperations)
+      }
     })
 
     it('should handle concurrent updates on different documents', async () => {
@@ -218,18 +217,22 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
       // Create a promise chain for each product
       for (let i = 0; i < inserted.length; i++) {
         const product = inserted[i]
-        let productPromise = Promise.resolve()
+        let productPromise: Promise<any> = Promise.resolve()
 
         // Chain the updates for each product sequentially
         for (let j = 0; j < 5; j++) { // 5 reservations per product
           productPromise = productPromise.then(async () => {
             const currentProduct = await products.findById(product._id)
-            return products.updateById(product._id, {
-              $set: {
-                stock: currentProduct.stock - 10,
-                reserved: currentProduct.reserved + 10
-              }
-            })
+            if (currentProduct != null) {
+              return await products.updateById(product._id, {
+                $set: {
+                  stock: currentProduct.stock - 10,
+                  reserved: currentProduct.reserved + 10
+                }
+              })
+            } else {
+              throw new DocuDBError('Product not found', MCO_ERROR.DOCUMENT.NOT_FOUND)
+            }
           })
         }
 
@@ -272,8 +275,8 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
 
       // Concurrently delete all completed tasks
       const completedTasks = inserted.filter(t => t.completed)
-      const deletionPromises = completedTasks.map(task =>
-        tasks.deleteById(task._id)
+      const deletionPromises = completedTasks.map(async task =>
+        await tasks.deleteById(task._id)
       )
 
       // Wait for all deletions to complete

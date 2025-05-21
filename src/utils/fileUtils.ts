@@ -10,16 +10,14 @@ import fs from 'node:fs'
  * @param {string} filePath - Path of the file or directory to check
  * @returns {Promise<boolean>} - true if it exists, false otherwise
  */
-async function fileExists (filePath) {
+export async function fileExists (filePath: string): Promise<boolean> {
   try {
     await fs.promises.stat(filePath)
     return true
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ENOENT') return false
     throw error
   }
 }
 
-export {
-  fileExists
-}
+export default { fileExists }

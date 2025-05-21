@@ -16,10 +16,10 @@ const gunzipPromise = promisify(zlib.gunzip)
  * @param {Buffer|string} data - Data to compress
  * @returns {Promise<Buffer>} - Compressed data
  */
-async function compress (data) {
+async function compress (data: Buffer | string): Promise<Buffer> {
   try {
     return await gzipPromise(data)
-  } catch (error) {
+  } catch (error: any) {
     throw new DocuDBError(`Error compressing data: ${error.message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
   }
 }
@@ -29,11 +29,11 @@ async function compress (data) {
  * @param {Buffer} compressedData - Compressed data
  * @returns {Promise<Buffer>} - Decompressed data
  */
-async function decompress (compressedData) {
+async function decompress (compressedData: Buffer): Promise<Buffer> {
   try {
     return await gunzipPromise(compressedData)
-  } catch (error) {
-    throw new DocuDBError(`Error decompressing data: ${error.message}`, MCO_ERROR.COMPRESSION.DECOMPRESS_ERROR, { originalError: error })
+  } catch (error: any) {
+    throw new DocuDBError(`Error decompressing data: ${error.message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
   }
 }
 

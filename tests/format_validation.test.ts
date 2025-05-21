@@ -1,21 +1,14 @@
 import { Database, Schema } from '../index.js'
 import { expect } from 'chai'
-import fs from 'node:fs'
-import path from 'node:path'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - Schema Format Validation', () => {
-  let db
+  let db: Database
   const testDbName = 'testFormatValidation'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
 
     db = new Database({
       name: testDbName,
@@ -25,9 +18,7 @@ describe('DocuDB - Schema Format Validation', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Format Validation with Regex', () => {
@@ -72,7 +63,7 @@ describe('DocuDB - Schema Format Validation', () => {
           phone: '123-456-7890'
         })
         expect.fail('Should have thrown validation error for invalid email format')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Does not match the required pattern')
       }
 
@@ -84,7 +75,7 @@ describe('DocuDB - Schema Format Validation', () => {
           phone: '1234567890' // Missing hyphens
         })
         expect.fail('Should have thrown validation error for invalid phone format')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Does not match the required pattern')
       }
     })
@@ -120,7 +111,7 @@ describe('DocuDB - Schema Format Validation', () => {
           name: 'Invalid ID Format Product'
         })
         expect.fail('Should have thrown validation error for invalid ID format')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Does not match the required pattern')
       }
     })

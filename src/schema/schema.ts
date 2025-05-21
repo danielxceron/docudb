@@ -4,13 +4,29 @@
  */
 
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
+import {
+  SchemaDefinition,
+  SchemaOptions,
+  ValidationRules,
+  Schema as SchemaInterface,
+  Document
+} from '../types/index.js'
 
-class Schema {
+class Schema implements SchemaInterface {
+  /** Schema definition */
+  public definition: SchemaDefinition
+  /** Schema options */
+  public options: SchemaOptions
+
   /**
-   * @param {Object} definition - Schema definition
-   * @param {Object} options - Additional options
+   * Creates a new schema for document validation
+   * @param definition - Schema definition with field types and validation rules
+   * @param options - Additional schema options
    */
-  constructor (definition, options = {}) {
+  constructor (
+    definition: SchemaDefinition,
+    options: SchemaOptions = { idType: 'mongo' }
+  ) {
     this.definition = definition
     this.options = {
       strict: options.strict !== false,
@@ -21,16 +37,19 @@ class Schema {
 
   /**
    * Validates a document against the schema
-   * @param {Object} document - Document to validate
-   * @returns {Object} - Validated and normalized document
-   * @throws {Error} - If the document does not comply with the schema
+   * @param document - Document to validate
+   * @returns Validated and normalized document
+   * @throws {DocuDBError} - If the document does not comply with the schema
    */
-  validate (document) {
+  validate (document: Document): Document {
     if (!document || typeof document !== 'object') {
-      throw new DocuDBError('The document must be an object', MCO_ERROR.SCHEMA.INVALID_DOCUMENT)
+      throw new DocuDBError(
+        'The document must be an object',
+        MCO_ERROR.SCHEMA.INVALID_DOCUMENT
+      )
     }
 
-    const validatedDoc = {}
+    const validatedDoc: Document = {}
 
     // Validate each field according to the schema definition
     for (const [field, fieldDef] of Object.entries(this.definition)) {
@@ -69,10 +88,10 @@ class Schema {
       }
 
       // Validate additional rules
-      if (fieldDef.validate) {
+      if (fieldDef.validate != null) {
         try {
           this._runValidators(value, fieldDef.validate, field)
-        } catch (error) {
+        } catch (error: any) {
           throw new DocuDBError(
             error.message,
             error.code || MCO_ERROR.SCHEMA.VALIDATION_ERROR,
@@ -82,7 +101,10 @@ class Schema {
       }
 
       // Apply transformations if they exist
-      if (fieldDef.transform && typeof fieldDef.transform === 'function') {
+      if (
+        fieldDef.transform != null &&
+        typeof fieldDef.transform === 'function'
+      ) {
         validatedDoc[field] = fieldDef.transform(value)
       } else {
         validatedDoc[field] = value
@@ -132,7 +154,7 @@ class Schema {
    * @returns {boolean} - Indicates if the value is of the expected type
    * @private
    */
-  _validateType (value, type) {
+  _validateType (value: any, type: string | Function): boolean {
     if (typeof type === 'function') {
       return value instanceof type
     }
@@ -149,7 +171,9 @@ class Schema {
       case 'array':
         return Array.isArray(value)
       case 'object':
-        return typeof value === 'object' && value !== null && !Array.isArray(value)
+        return (
+          typeof value === 'object' && value !== null && !Array.isArray(value)
+        )
       default:
         return true // Unknown type, assume valid
     }
@@ -162,87 +186,76 @@ class Schema {
    * @returns {Object} - Validation result
    * @private
    */
-  _runValidators (value, validators, field) {
-    // If it's a function, execute it directly
-    if (typeof validators === 'function') {
-      try {
-        const result = validators(value)
-        if (result !== true) {
-          throw new DocuDBError(
-            result || 'Validation failed',
-            MCO_ERROR.SCHEMA.VALIDATION_ERROR,
-            { field, value }
-          )
-        }
-      } catch (error) {
-        if (error instanceof DocuDBError) throw error
+  _runValidators (value: any, validators: ValidationRules, field: string) {
+    // Validate min/max for numbers
+    if (typeof value === 'number') {
+      if ((validators.min !== undefined) && value < validators.min) {
         throw new DocuDBError(
-          error.message,
-          MCO_ERROR.SCHEMA.VALIDATION_ERROR,
-          { field, value }
+          `The value must be greater than or equal to ${validators.min}`,
+          MCO_ERROR.SCHEMA.INVALID_VALUE,
+          { field, value, min: validators.min }
         )
       }
-    } else if (Array.isArray(validators)) {
-      for (const validator of validators) {
-        this._runValidators(value, validator, field)
+      if ((validators.max !== undefined) && value > validators.max) {
+        throw new DocuDBError(
+          `The value must be less than or equal to ${validators.max}`,
+          MCO_ERROR.SCHEMA.INVALID_VALUE,
+          { field, value, max: validators.max }
+        )
       }
-    } else if (typeof validators === 'object') {
-      // Validate min/max for numbers
-      if (typeof value === 'number') {
-        if ('min' in validators && value < validators.min) {
-          throw new DocuDBError(
-            `The value must be greater than or equal to ${validators.min}`,
-            MCO_ERROR.SCHEMA.INVALID_VALUE,
-            { field, value, min: validators.min }
-          )
-        }
-        if ('max' in validators && value > validators.max) {
-          throw new DocuDBError(
-            `The value must be less than or equal to ${validators.max}`,
-            MCO_ERROR.SCHEMA.INVALID_VALUE,
-            { field, value, max: validators.max }
-          )
-        }
+    }
+
+    // Validate minLength/maxLength for strings and arrays
+    if (typeof value === 'string' || Array.isArray(value)) {
+      if ((validators.minLength !== undefined) && value.length < validators.minLength) {
+        throw new DocuDBError(
+          `The length must be greater than or equal to ${validators.minLength}`,
+          MCO_ERROR.SCHEMA.INVALID_LENGTH,
+          {
+            field,
+            value,
+            minLength: validators.minLength,
+            currentLength: value.length
+          }
+        )
       }
-      // Validate minLength/maxLength for strings and arrays
-      if (typeof value === 'string' || Array.isArray(value)) {
-        if ('minLength' in validators && value.length < validators.minLength) {
-          throw new DocuDBError(
-            `The length must be greater than or equal to ${validators.minLength}`,
-            MCO_ERROR.SCHEMA.INVALID_LENGTH,
-            { field, value, minLength: validators.minLength, currentLength: value.length }
-          )
-        }
-        if ('maxLength' in validators && value.length > validators.maxLength) {
-          throw new DocuDBError(
-            `The length must be less than or equal to ${validators.maxLength}`,
-            MCO_ERROR.SCHEMA.INVALID_LENGTH,
-            { field, value, maxLength: validators.maxLength, currentLength: value.length }
-          )
-        }
+      if ((validators.maxLength !== undefined) && value.length > validators.maxLength) {
+        throw new DocuDBError(
+          `The length must be less than or equal to ${validators.maxLength}`,
+          MCO_ERROR.SCHEMA.INVALID_LENGTH,
+          {
+            field,
+            value,
+            maxLength: validators.maxLength,
+            currentLength: value.length
+          }
+        )
       }
-      // Validate pattern for strings
-      if (typeof value === 'string' && validators.pattern) {
-        const pattern = validators.pattern instanceof RegExp
+    }
+
+    // Validate pattern for strings
+    if (typeof value === 'string' && validators.pattern != null) {
+      const pattern =
+        validators.pattern instanceof RegExp
           ? validators.pattern
           : new RegExp(validators.pattern)
 
-        if (!pattern.test(value)) {
-          throw new DocuDBError(
-            'Does not match the required pattern',
-            MCO_ERROR.SCHEMA.INVALID_REGEX,
-            { field, value, pattern: pattern.toString() }
-          )
-        }
-      }
-      // Validate enum
-      if (validators.enum && !validators.enum.includes(value)) {
+      if (!pattern.test(value)) {
         throw new DocuDBError(
-          `The value must be one of: ${validators.enum.join(', ')}`,
-          MCO_ERROR.SCHEMA.INVALID_ENUM,
-          { field, value, allowedValues: validators.enum }
+          'Does not match the required pattern',
+          MCO_ERROR.SCHEMA.INVALID_REGEX,
+          { field, value, pattern: pattern.toString() }
         )
       }
+    }
+
+    // Validate enum
+    if (validators.enum != null && !validators.enum.includes(value)) {
+      throw new DocuDBError(
+        `The value must be one of: ${validators.enum.join(', ')}`,
+        MCO_ERROR.SCHEMA.INVALID_ENUM,
+        { field, value, allowedValues: validators.enum }
+      )
     }
   }
 }

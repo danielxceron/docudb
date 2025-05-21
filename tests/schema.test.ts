@@ -1,22 +1,17 @@
 import { Database, Schema, Query } from '../index.js'
 import { expect } from 'chai'
-import fs from 'node:fs'
-import path from 'node:path'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { Collection } from '../src/core/database.js'
+
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - Schema Validation', () => {
-  let db
-  let productos
+  let db: Database
+  let productos: Collection
   const testDbName = 'testSchema'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
 
     db = new Database({
       name: testDbName,
@@ -50,9 +45,7 @@ describe('DocuDB - Schema Validation', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Schema Validation', () => {
@@ -64,7 +57,7 @@ describe('DocuDB - Schema Validation', () => {
           invalidField: 'test'
         })
         expect.fail('Should have thrown validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('invalidField')
       }
     })
@@ -77,7 +70,7 @@ describe('DocuDB - Schema Validation', () => {
           categorias: ['test']
         })
         expect.fail('Should have thrown validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('greater than or equal to 3')
       }
     })
@@ -90,7 +83,7 @@ describe('DocuDB - Schema Validation', () => {
           categorias: ['test']
         })
         expect.fail('Should have thrown validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('greater than or equal to 0')
       }
     })
@@ -103,7 +96,7 @@ describe('DocuDB - Schema Validation', () => {
           categorias: [] // Empty array
         })
         expect.fail('Should have thrown validation error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('greater than or equal to 1')
       }
     })
@@ -112,7 +105,7 @@ describe('DocuDB - Schema Validation', () => {
 
 describe('DocuDB - Schema Data Type Preservation', () => {
   describe('Basic Type Validation', () => {
-    let schema
+    let schema: Schema
 
     beforeEach(() => {
       schema = new Schema({
@@ -221,15 +214,12 @@ describe('DocuDB - Schema Data Type Preservation', () => {
 })
 
 describe('DocuDB - Query Operations', () => {
-  let db
-  let productos
+  let db: Database
+  let productos: Collection
   const testDbName = 'testQuery'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
 
     db = new Database({
       name: testDbName,
@@ -282,9 +272,7 @@ describe('DocuDB - Query Operations', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Basic Queries', () => {
@@ -350,15 +338,12 @@ describe('DocuDB - Query Operations', () => {
 })
 
 describe('DocuDB - Data Type Preservation After Query Operations', () => {
-  let db
-  let products
+  let db: Database
+  let products: Collection
   const testDbName = 'testDataTypes'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
 
     db = new Database({
       name: testDbName,
@@ -389,22 +374,23 @@ describe('DocuDB - Data Type Preservation After Query Operations', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Data Type Preservation After Find Operations', () => {
     it('should maintain data types after find operation', async () => {
       const result = await products.findOne({ name: 'Test Product' })
+      expect(result).to.exist
 
-      expect(typeof result.name).to.equal('string')
-      expect(typeof result.price).to.equal('number')
-      expect(typeof result.stock).to.equal('number')
-      expect(result.lastUpdated).to.be.instanceOf(Date)
-      expect(Array.isArray(result.tags)).to.be.true
-      expect(typeof result.metadata).to.equal('object')
-      expect(result.metadata).to.not.be.an('array')
+      if (result != null) {
+        expect(typeof result.name).to.equal('string')
+        expect(typeof result.price).to.equal('number')
+        expect(typeof result.stock).to.equal('number')
+        expect(result.lastUpdated).to.be.instanceOf(Date)
+        expect(Array.isArray(result.tags)).to.be.true
+        expect(typeof result.metadata).to.equal('object')
+        expect(result.metadata).to.not.be.an('array')
+      }
     })
 
     it('should maintain data types after complex query operations', async () => {
@@ -413,58 +399,82 @@ describe('DocuDB - Data Type Preservation After Query Operations', () => {
         tags: { $in: ['test'] }
       })
 
-      expect(typeof result.name).to.equal('string')
-      expect(typeof result.price).to.equal('number')
-      expect(result.lastUpdated).to.be.instanceOf(Date)
-      expect(Array.isArray(result.tags)).to.be.true
+      expect(result).to.exist
+
+      if (result != null) {
+        expect(typeof result.name).to.equal('string')
+        expect(typeof result.price).to.equal('number')
+        expect(result.lastUpdated).to.be.instanceOf(Date)
+        expect(Array.isArray(result.tags)).to.be.true
+      }
     })
   })
 
   describe('Data Type Preservation After Update Operations', () => {
     it('should maintain data types after full document update', async () => {
       const doc = await products.findOne({ name: 'Test Product' })
-      const updated = await products.updateById(doc._id, {
-        $set: {
-          price: 150,
-          stock: 10,
-          lastUpdated: new Date(),
-          tags: ['test', 'updated'],
-          metadata: { status: 'updated' }
+      expect(doc).to.exist
+
+      if (doc != null) {
+        const updated = await products.updateById(doc._id, {
+          $set: {
+            price: 150,
+            stock: 10,
+            lastUpdated: new Date(),
+            tags: ['test', 'updated'],
+            metadata: { status: 'updated' }
+          }
+        })
+
+        expect(updated).to.exist
+
+        if (updated != null) {
+          expect(typeof updated.price).to.equal('number')
+          expect(typeof updated.stock).to.equal('number')
+          expect(updated.lastUpdated).to.be.instanceOf(Date)
+          expect(Array.isArray(updated.tags)).to.be.true
+          expect(typeof updated.metadata).to.equal('object')
+          expect(updated.metadata).to.not.be.an('array')
         }
-      })
 
-      expect(typeof updated.price).to.equal('number')
-      expect(typeof updated.stock).to.equal('number')
-      expect(updated.lastUpdated).to.be.instanceOf(Date)
-      expect(Array.isArray(updated.tags)).to.be.true
-      expect(typeof updated.metadata).to.equal('object')
-      expect(updated.metadata).to.not.be.an('array')
+        // Verify data persistence
+        const retrieved = await products.findById(doc._id)
 
-      // Verify data persistence
-      const retrieved = await products.findById(doc._id)
-      expect(typeof retrieved.price).to.equal('number')
-      expect(typeof retrieved.stock).to.equal('number')
-      expect(retrieved.lastUpdated).to.be.instanceOf(Date)
-      expect(Array.isArray(retrieved.tags)).to.be.true
-      expect(typeof retrieved.metadata).to.equal('object')
+        expect(retrieved).to.exist
+
+        if (retrieved != null) {
+          expect(typeof retrieved.price).to.equal('number')
+          expect(typeof retrieved.stock).to.equal('number')
+          expect(retrieved.lastUpdated).to.be.instanceOf(Date)
+          expect(Array.isArray(retrieved.tags)).to.be.true
+          expect(typeof retrieved.metadata).to.equal('object')
+        }
+      }
     })
 
     it('should maintain data types after partial update', async () => {
       const doc = await products.findOne({ name: 'Test Product' })
+      expect(doc).to.exist
 
-      // Partial update
-      await products.updateById(doc._id, {
-        $set: {
-          price: 200
+      if (doc != null) {
+        // Partial update
+        await products.updateById(doc._id, {
+          $set: {
+            price: 200
+          }
+        })
+
+        const updated = await products.findById(doc._id)
+        expect(updated).to.exist
+
+        if (updated != null) {
+          expect(typeof updated.price).to.equal('number')
+          expect(typeof updated.stock).to.equal('number')
+          expect(updated.lastUpdated).to.be.instanceOf(Date)
+          expect(Array.isArray(updated.tags)).to.be.true
+          expect(typeof updated.metadata).to.equal('object')
         }
-      })
-
-      const updated = await products.findById(doc._id)
-      expect(typeof updated.price).to.equal('number')
-      expect(typeof updated.stock).to.equal('number')
-      expect(updated.lastUpdated).to.be.instanceOf(Date)
-      expect(Array.isArray(updated.tags)).to.be.true
-      expect(typeof updated.metadata).to.equal('object')
+      }
     })
   })
 })

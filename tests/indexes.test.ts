@@ -1,22 +1,17 @@
 import { Database, Schema } from '../index.js'
 import { expect } from 'chai'
-import fs from 'node:fs'
-import path from 'node:path'
 
-import { fileURLToPath } from 'node:url'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import { Collection } from '../src/core/database.js'
+
+import { cleanTestDataDir } from './utils.js'
 
 describe('DocuDB - Indexes and Constraints', () => {
-  let db
-  let productos
+  let db: Database
+  let productos: Collection
   const testDbName = 'testIndexes'
-  const testDataDir = path.join(__dirname, '..', 'data', testDbName)
 
   beforeEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
 
     db = new Database({
       name: testDbName,
@@ -35,9 +30,7 @@ describe('DocuDB - Indexes and Constraints', () => {
   })
 
   afterEach(async () => {
-    if (fs.existsSync(testDataDir)) {
-      fs.rmSync(testDataDir, { recursive: true })
-    }
+    await cleanTestDataDir(testDbName)
   })
 
   describe('Unique Indexes', () => {
@@ -65,7 +58,7 @@ describe('DocuDB - Indexes and Constraints', () => {
           price: 200
         })
         expect.fail('Should have thrown a duplicate error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Duplicate')
       }
     })
@@ -92,7 +85,10 @@ describe('DocuDB - Indexes and Constraints', () => {
         $set: { price: 150 }
       })
 
-      expect(updated.price).to.equal(150)
+      expect(updated).to.exist
+      if (updated != null) {
+        expect(updated.price).to.equal(150)
+      }
     })
 
     it('should reject update that violates uniqueness constraint', async () => {
@@ -118,7 +114,7 @@ describe('DocuDB - Indexes and Constraints', () => {
           $set: { codigo: 'XYZ789' } // This code already exists
         })
         expect.fail('Should have thrown a duplicate error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Duplicate')
       }
     })
@@ -126,14 +122,15 @@ describe('DocuDB - Indexes and Constraints', () => {
 
   describe('Composite Indexes', () => {
     it('should create a composite index correctly', async () => {
-      const result = await productos.createIndex(['categoria', 'name'], { name: 'idx_cat_name' })
+      const result = await productos.createIndex(['categoria', 'name'], {
+        name: 'idx_cat_name'
+      })
       expect(result).to.be.true
     })
 
     it('should reject duplicate documents in unique composite index', async () => {
       // Create unique composite index
       await productos.createIndex(['categoria', 'name'], { unique: true })
-
       // Insert first document
       await productos.insertOne({
         name: 'Laptop',
@@ -151,7 +148,7 @@ describe('DocuDB - Indexes and Constraints', () => {
           categoria: 'Electronics' // Same category
         })
         expect.fail('Should have thrown a duplicate error')
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include('Duplicate')
       }
 
@@ -177,7 +174,9 @@ describe('DocuDB - Indexes and Constraints', () => {
 
       const codigoIndex = indices.find(idx => idx.field === 'codigo')
       expect(codigoIndex).to.exist
-      expect(codigoIndex.unique).to.be.true
+      if (codigoIndex != null) {
+        expect(codigoIndex.unique).to.be.true
+      }
     })
 
     it('should delete an index correctly', async () => {

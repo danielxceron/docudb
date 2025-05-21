@@ -1,15 +1,22 @@
 {
   "name": "docudb",
-  "version": "0.0.0-alpha.4",
+  "version": "0.0.0-alpha.5",
   "description": "Document-based NoSQL database for NodeJS",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "test": "mocha test/**/*.js",
-    "lint": "standard",
-    "lint:fix": "standard --fix",
-    "lint:check": "standard --verbose"
+    "build": "tsc",
+    "prepare": "npm run build",
+    "test": "tsc && mocha dist/tests/**/*.js",
+    "test:mocha": "npm run build && mocha",
+    "lint": "ts-standard",
+    "lint:fix": "ts-standard --fix",
+    "lint:check": "ts-standard --verbose"
   },
+  "files": [
+    "dist"
+  ],
   "keywords": [
     "database",
     "nosql",
@@ -18,10 +25,11 @@
     "compression",
     "nodejs"
   ],
-  "author": "",
+  "author": "Daniel Cerón Claros",
   "license": "MIT",
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=22.15.0",
+    "typescript": ">=5.8.3"
   },
   "repository": {
     "type": "git",
@@ -32,27 +40,12 @@
   },
   "homepage": "https://github.com/danielxceron/DocuDB#readme",
   "devDependencies": {
+    "@types/chai": "^5.2.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.20",
     "chai": "^5.2.0",
     "mocha": "^11.3.0",
-    "standard": "^17.1.2"
-  },
-  "standard": {
-    "extends": "standard",
-    "globals": [
-      "describe",
-      "it",
-      "before",
-      "after",
-      "beforeEach",
-      "afterEach",
-      "expect"
-    ],
-    "env": [
-      "node",
-      "mocha"
-    ],
-    "rules": {
-      "no-unused-expressions": 0
-    }
+    "ts-standard": "^12.0.2",
+    "typescript": "^5.8.3"
   }
 }

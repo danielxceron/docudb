@@ -1,23 +1,19 @@
 # DocuDB
 
-A lightweight, document-based NoSQL database for NodeJS with no external dependencies.
+DocuDB is a lightweight, document-based NoSQL database for Node.js applications. It provides a MongoDB-like interface with zero external dependencies, making it perfect for small to medium-sized projects or environments where a full database installation is not feasible.
 
 ## Features
 
-- **Document-based storage**: Store and retrieve JSON documents
-- **Schema validation**: Define document structures with validation rules
-- **Indexing**: Create single-field and composite indexes for faster queries
-- **Unique constraints**: Enforce data integrity with unique field constraints
-- **Query filtering**: Filter documents using MongoDB-like query syntax
-- **Chunked storage**: Efficiently handle large datasets with data chunking
+- **Document-Based Storage**: Store and retrieve JSON documents with automatic ID generation
+- **Schema Validation**: Define schemas to validate document structure and data types
+- **Indexing**: Create and manage indexes for faster queries
+- **Query System**: Powerful query capabilities with MongoDB-like syntax
 - **Compression**: Optional gzip compression to reduce storage size
-- **Concurrency support**: Handle multiple concurrent operations
-- **Data persistence**: Reliable data storage that persists across restarts
-- **Error handling**: Comprehensive error handling and validation
-
-## Requirements
-
-- Node.js >= 14.14.1
+- **Chunking**: Efficient handling of large documents through chunking
+- **UUID Support**: Choose between MongoDB-style IDs or UUID v4 format
+- **Custom Default Functions**: Define dynamic default values using custom functions
+- **TypeScript Support**: Full TypeScript definitions for enhanced developer experience
+- **Zero Dependencies**: No external runtime dependencies
 
 ## Installation
 
@@ -25,204 +21,229 @@ A lightweight, document-based NoSQL database for NodeJS with no external depende
 npm install docudb
 ```
 
-Or add it to your project:
+## Basic Usage
 
-```bash
-npm install --save docudb
-```
-
-## Quick Start
-
-```javascript
+```typescript
 import { Database, Schema } from 'docudb';
 
-// Create and initialize a database
-const db = new Database({
+// Initialize database
+const db = new Database({ 
   name: 'myDatabase',
-  compression: true // Enable compression
+  compression: true
 });
 
 await db.initialize();
 
-// Define a schema for your collection
+// Create a collection with schema
 const userSchema = new Schema({
   name: { type: 'string', required: true },
   email: { type: 'string', required: true },
-  age: { type: 'number', validate: { min: 18 } },
-  createdAt: { type: 'date', default: new Date() }
-}, { strict: true });
+  age: { type: 'number', default: 0 },
+  createdAt: { type: 'date', default: () => new Date() }
+});
 
-// Create a collection with the schema
 const users = db.collection('users', { schema: userSchema });
-
-// Create a unique index on email field
-await users.createIndex('email', { unique: true });
 
 // Insert a document
 const user = await users.insertOne({
   name: 'John Doe',
   email: 'john@example.com',
-  age: 25
+  age: 30
 });
 
-// Find documents
-const allUsers = await users.find({});
-const johnUser = await users.findOne({ name: 'John Doe' });
-const adultUsers = await users.find({ age: { $gte: 21 } });
+console.log('Inserted user:', user);
+
+// Query documents
+const results = await users.find({ age: { $gt: 25 } });
+console.log('Users over 25:', results);
 
 // Update a document
-const updatedUser = await users.updateById(user._id, {
-  $set: { age: 26 }
+const updated = await users.updateById(user._id, {
+  $set: { age: 31 }
 });
 
 // Delete a document
 await users.deleteById(user._id);
 ```
 
-## API Reference
+## Configuration Options
 
-### Database
+### Database Options
 
-```javascript
-const db = new Database(options);
+```typescript
+const db = new Database({
+  name: 'myDatabase',       // Database name (default: 'docudb')
+  dataDir: './data',        // Data directory (default: './data')
+  chunkSize: 2 * 1024 * 1024, // Chunk size in bytes (default: 1MB)
+  compression: true,        // Enable compression (default: true)
+  idType: 'uuid'            // ID generation type: 'mongo' or 'uuid' (default: 'mongo')
+});
 ```
 
-**Options:**
-- `name`: Database name (default: 'docudb')
-- `dataDir`: Directory to store data (default: './data/{name}')
-- `chunkSize`: Maximum chunk size in bytes (default: 1MB)
-- `compression`: Enable/disable compression (default: true)
+### Collection Options
 
-**Methods:**
-- `initialize()`: Initialize the database
-- `collection(name, options)`: Get or create a collection
-- `dropCollection(name)`: Delete a collection
-- `listCollections()`: List all collections
-
-### Collection
-
-**Methods:**
-- `insertOne(document)`: Insert a single document
-- `insertMany(documents)`: Insert multiple documents
-- `find(query)`: Find documents matching the query
-- `findOne(query)`: Find the first document matching the query
-- `findById(id)`: Find a document by its ID
-- `updateOne(query, update)`: Update the first document matching the query
-- `updateMany(query, update)`: Update all documents matching the query
-- `updateById(id, update)`: Update a document by its ID
-- `deleteMany(query)`: Delete all documents matching the query
-- `deleteById(id)`: Delete a document by its ID
-- `count(query)`: Count documents matching the query
-
-### Indexes
-
-**Methods:**
-- `createIndex(field, options)`: Create an index on a field or fields
-- `dropIndex(field)`: Delete an index
-- `listIndexes()`: List all indexes in the collection
-
-**Index Options:**
-- `unique`: Whether the index should enforce uniqueness (default: false)
-- `name`: Custom name for the index
-
-### Schema
-
-```javascript
-const schema = new Schema(definition, options);
+```typescript
+const collection = db.collection('myCollection', {
+  schema: mySchema,         // Schema for validation
+  idType: 'uuid',           // Override database ID type
+  timestamps: true          // Add createdAt and updatedAt fields automatically
+});
 ```
 
-**Field Definition Properties:**
-- `type`: Data type ('string', 'number', 'boolean', 'date', 'object', 'array')
-- `required`: Whether the field is required (default: false)
-- `default`: Default value if not provided. Can be a static value or a function
-- `validate`: Validation rules (min, max, minLength, maxLength, pattern, enum, custom function)
+## Schema Validation
 
-**Format Validation with Regular Expressions:**
+DocuDB supports schema validation to ensure data integrity:
 
-You can use the `pattern` property to validate string fields against regular expression patterns:
-
-```javascript
-const schema = new Schema({
-  email: { 
+```typescript
+const productSchema = new Schema({
+  name: { 
     type: 'string', 
     required: true,
-    validate: { 
-      pattern: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/ // Email pattern validation
-    }
+    validate: { minLength: 3 }
   },
-  customId: {
-    type: 'string',
-    validate: {
-      pattern: /^PROD-\d{4}$/ // Validate ID pattern (e.g., PROD-1234)
-    }
+  price: { 
+    type: 'number', 
+    required: true,
+    validate: { min: 0 }
+  },
+  tags: { 
+    type: 'array', 
+    default: [] 
+  },
+  inStock: { 
+    type: 'boolean', 
+    default: true 
+  },
+  metadata: { 
+    type: 'object', 
+    default: {} 
   }
 });
 ```
 
-**Custom Default Functions:**
+## Custom Default Functions
 
-You can use functions as default values, which will be executed when a document is created:
+You can define dynamic default values using custom functions:
 
-```javascript
+```typescript
 const schema = new Schema({
-  createdAt: { 
-    type: 'date', 
-    default: () => new Date() 
+  createdAt: {
+    type: 'date',
+    default: () => new Date()
   },
-  code: { 
+  code: {
     type: 'string',
-    // The function receives the document being processed
-    default: (doc) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}` 
-  },
-  // You can even customize the _id field
-  _id: {
-    type: 'string',
-    default: () => generateUUID(), // Or any custom ID generation logic
-    validate: {
-      pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/ // UUID v4 pattern
-    }
+    // Generate a code based on the document
+    default: (doc) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}`
   }
 });
 ```
 
-**Schema Options:**
-- `strict`: Reject fields not in the schema (default: true)
-- `timestamps`: Automatically add _createdAt and _updatedAt fields (default: false)
+## UUID Support
 
-**Collection Options:**
-- `schema`: Schema for document validation
-- `idType`: ID format to use ('uuid' for UUID v4, default: MongoDB-style IDs)
+DocuDB supports both MongoDB-style IDs and UUID v4 format:
+
+```typescript
+// Collection with UUID IDs
+const products = db.collection('products', { idType: 'uuid' });
+
+// Insert a document (will have UUID v4 _id)
+const product = await products.insertOne({
+  name: 'Laptop',
+  price: 999
+});
+
+// You can also provide your own UUID
+const customProduct = await products.insertOne({
+  _id: '123e4567-e89b-42d3-a456-556642440000', // Valid UUID v4
+  name: 'Custom ID Product',
+  price: 599
+});
+```
+
+## Query Operations
+
+DocuDB supports MongoDB-like query operations:
+
+```typescript
+// Find all documents
+const allProducts = await products.find({});
+
+// Find with conditions
+const expensiveProducts = await products.find({ 
+  price: { $gt: 500 },
+  inStock: true
+});
+
+// Find one document
+const laptop = await products.findOne({ name: 'Laptop' });
+
+// Find by ID
+const product = await products.findById('123e4567-e89b-42d3-a456-556642440000');
+
+// Count documents
+const count = await products.count({ price: { $lt: 100 } });
+```
+
+## Update Operations
+
+```typescript
+// Update by ID
+const updated = await products.updateById(productId, {
+  $set: { price: 899, inStock: false }
+});
+
+// Update one document
+const result = await products.updateOne(
+  { name: 'Laptop' },
+  { $inc: { stock: -1 } }
+);
+
+// Update many documents
+const result = await products.updateMany(
+  { category: 'Electronics' },
+  { $set: { discount: 10 } }
+);
+```
+
+## Indexing
+
+Create indexes to improve query performance:
+
+```typescript
+// Create a simple index
+await products.createIndex({ field: 'name' });
+
+// Create a unique index
+await products.createIndex({ 
+  field: 'sku',
+  unique: true
+});
+
+// Create a compound index
+await products.createIndex({ 
+  field: ['category', 'brand'],
+  name: 'category_brand_idx'
+});
+```
 
 ## Error Handling
 
-DocuDB provides a comprehensive error handling system with specific error codes and messages:
+DocuDB provides detailed error information:
 
-```javascript
-const { MCO_ERROR, DocuDBError } = require('docudb');
-
+```typescript
 try {
-  // Database operations
+  await products.insertOne({
+    name: 'Invalid Product',
+    price: 'not-a-number' // Schema violation
+  });
 } catch (error) {
-  if (error instanceof DocuDBError) {
-    console.error(`Error code: ${error.code}, Message: ${error.message}`);
+  if (error.code === 'SCHEMA_VALIDATION_ERROR') {
+    console.error('Validation error:', error.details);
   } else {
-    console.error('Unexpected error:', error);
+    console.error('Database error:', error.message);
   }
 }
-```
-
-## Testing
-
-Run the test suite:
-
-```bash
-npm test
-```
-
-Run linting:
-
-```bash
-npm run lint
 ```
 
 ## License
