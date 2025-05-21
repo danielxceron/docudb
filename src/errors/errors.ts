@@ -35,6 +35,7 @@ export interface DatabaseErrorCodes {
  * Schema error codes
  */
 export interface SchemaErrorCodes {
+  CUSTOM_VALIDATION_ERROR: string
   INVALID_ENUM: any
   INVALID_REGEX: any
   INVALID_LENGTH: any
@@ -158,6 +159,7 @@ const MCO_ERROR: ErrorCodes = {
     INVALID_TYPE: 'SCH003',
     VALIDATION_ERROR: 'SCH004',
     INVALID_FIELD: 'SCH005',
+    CUSTOM_VALIDATION_ERROR: 'SCH006',
     INVALID_ENUM: undefined,
     INVALID_REGEX: undefined,
     INVALID_LENGTH: undefined,

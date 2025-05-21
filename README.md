@@ -121,6 +121,73 @@ const productSchema = new Schema({
 });
 ```
 
+### Pattern Validation
+
+You can use regular expressions to validate string formats:
+
+```typescript
+const userSchema = new Schema({
+  email: {
+    type: 'string',
+    required: true,
+    validate: {
+      pattern: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/,
+      message: 'Invalid email format'
+    }
+  },
+  phone: {
+    type: 'string',
+    validate: {
+      pattern: /^\+?[1-9]\d{1,14}$/,  // E.164 format
+      message: 'Phone number must be in international format'
+    }
+  },
+  username: {
+    type: 'string',
+    required: true,
+    validate: {
+      pattern: /^[a-z0-9_-]{3,16}$/,
+      message: 'Username must be 3-16 characters and contain only letters, numbers, underscores or hyphens'
+    }
+  },
+  productCode: {
+    type: 'string',
+    validate: {
+      // Custom product code format: ABC-12345
+      pattern: /^[A-Z]{3}-\d{5}$/,
+      message: 'Product code must be in format: ABC-12345'
+    }
+  }
+});
+
+// Combining pattern validation with other validations
+const advancedSchema = new Schema({
+  url: {
+    type: 'string',
+    validate: {
+      pattern: /^https?:\/\/[\w\.-]+\.[a-z]{2,}\/?.*$/,
+      minLength: 10,
+      maxLength: 2048,
+      message: 'Invalid URL format'
+    }
+  },
+  zipCode: {
+    type: 'string',
+    validate: {
+      // Support multiple country formats with conditional validation
+      custom: (value, doc) => {
+        if (doc.country === 'US') {
+          return /^\d{5}(-\d{4})?$/.test(value) || 'Invalid US zip code';
+        } else if (doc.country === 'CA') {
+          return /^[A-Za-z]\d[A-Za-z] ?\d[A-Za-z]\d$/.test(value) || 'Invalid Canadian postal code';
+        }
+        return true;
+      }
+    }
+  }
+});
+```
+
 ## Custom Default Functions
 
 You can define dynamic default values using custom functions:

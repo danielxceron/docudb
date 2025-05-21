@@ -204,8 +204,10 @@ export interface ValidationRules {
   pattern?: RegExp
   /** Enumerated allowed values */
   enum?: any[]
-  /** Custom validation function */
-  custom?: (value: any) => boolean | Promise<boolean>
+  /** Custom validation function that can return a boolean or an error message */
+  custom?: (value: any, doc?: any) => boolean | string | Promise<boolean | string>
+  /** Custom error message for validation failures */
+  message?: string
 }
 
 /**

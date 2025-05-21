@@ -90,7 +90,7 @@ class Schema implements SchemaInterface {
       // Validate additional rules
       if (fieldDef.validate != null) {
         try {
-          this._runValidators(value, fieldDef.validate, field)
+          this._runValidators(value, fieldDef.validate, field, document)
         } catch (error: any) {
           throw new DocuDBError(
             error.message,
@@ -183,22 +183,24 @@ class Schema implements SchemaInterface {
    * Executes custom validators
    * @param {*} value - Value to validate
    * @param {Function|Array|Object} validators - Validators to execute
-   * @returns {Object} - Validation result
+   * @param {string} field - Field name being validated
+   * @param {Document} document - The complete document being validated
+   * @returns {void} - Throws an error if validation fails
    * @private
    */
-  _runValidators (value: any, validators: ValidationRules, field: string) {
+  _runValidators (value: any, validators: ValidationRules, field: string, document?: Document): void {
     // Validate min/max for numbers
     if (typeof value === 'number') {
       if ((validators.min !== undefined) && value < validators.min) {
         throw new DocuDBError(
-          `The value must be greater than or equal to ${validators.min}`,
+          validators.message || `The value must be greater than or equal to ${validators.min}`,
           MCO_ERROR.SCHEMA.INVALID_VALUE,
           { field, value, min: validators.min }
         )
       }
       if ((validators.max !== undefined) && value > validators.max) {
         throw new DocuDBError(
-          `The value must be less than or equal to ${validators.max}`,
+          validators.message || `The value must be less than or equal to ${validators.max}`,
           MCO_ERROR.SCHEMA.INVALID_VALUE,
           { field, value, max: validators.max }
         )
@@ -209,7 +211,7 @@ class Schema implements SchemaInterface {
     if (typeof value === 'string' || Array.isArray(value)) {
       if ((validators.minLength !== undefined) && value.length < validators.minLength) {
         throw new DocuDBError(
-          `The length must be greater than or equal to ${validators.minLength}`,
+          validators.message || `The length must be greater than or equal to ${validators.minLength}`,
           MCO_ERROR.SCHEMA.INVALID_LENGTH,
           {
             field,
@@ -221,7 +223,7 @@ class Schema implements SchemaInterface {
       }
       if ((validators.maxLength !== undefined) && value.length > validators.maxLength) {
         throw new DocuDBError(
-          `The length must be less than or equal to ${validators.maxLength}`,
+          validators.message || `The length must be less than or equal to ${validators.maxLength}`,
           MCO_ERROR.SCHEMA.INVALID_LENGTH,
           {
             field,
@@ -242,7 +244,7 @@ class Schema implements SchemaInterface {
 
       if (!pattern.test(value)) {
         throw new DocuDBError(
-          'Does not match the required pattern',
+          validators.message || 'Does not match the required pattern',
           MCO_ERROR.SCHEMA.INVALID_REGEX,
           { field, value, pattern: pattern.toString() }
         )
@@ -252,10 +254,33 @@ class Schema implements SchemaInterface {
     // Validate enum
     if (validators.enum != null && !validators.enum.includes(value)) {
       throw new DocuDBError(
-        `The value must be one of: ${validators.enum.join(', ')}`,
+        validators.message || `The value must be one of: ${validators.enum.join(', ')}`,
         MCO_ERROR.SCHEMA.INVALID_ENUM,
         { field, value, allowedValues: validators.enum }
       )
+    }
+
+    // Run custom validator if provided
+    if (validators.custom != null) {
+      const result = validators.custom(value, document)
+
+      // If result is a string, it's an error message
+      if (typeof result === 'string') {
+        throw new DocuDBError(
+          result,
+          MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
+          { field, value }
+        )
+      }
+
+      // If result is false, validation failed
+      if (result === false) {
+        throw new DocuDBError(
+          validators.message || 'Failed custom validation',
+          MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
+          { field, value }
+        )
+      }
     }
   }
 }
