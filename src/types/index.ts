@@ -3,16 +3,25 @@
  * Contains interfaces and types for all major components
  */
 
+/**
+ * ID generation strategy
+ */
 export type IdType = 'mongo' | 'uuid'
+
+/**
+ * Common configuration options shared across components
+ */
+export interface CommonOptions {
+  /** Directory to store data */
+  dataDir: string
+}
 
 /**
  * Database configuration options
  */
-export interface DatabaseOptions {
+export interface DatabaseOptions extends Partial<CommonOptions> {
   /** Database name */
   name?: string
-  /** Directory to store data */
-  dataDir?: string
   /** Maximum chunk size in bytes */
   chunkSize?: number
   /** Indicates if compression should be used */
@@ -24,9 +33,7 @@ export interface DatabaseOptions {
 /**
  * Storage options for file management
  */
-export interface StorageOptions {
-  /** Directory to store data */
-  dataDir: string
+export interface StorageOptions extends CommonOptions {
   /** Maximum chunk size in bytes */
   chunkSize: number
   /** Indicates if compression should be used */
@@ -36,49 +43,54 @@ export interface StorageOptions {
 /**
  * Index manager options
  */
-export interface IndexManagerOptions {
-  /** Directory to store index data */
-  dataDir: string
-}
+export interface IndexManagerOptions extends CommonOptions {}
+
+/**
+ * Field definition for indexes
+ */
+export type IndexField = string | string[]
 
 /**
  * Metadata for a collection
  */
 export interface Metadata {
-  indices: MetadataProperties[]
+  indices: IndexMetadataProperties[]
 }
 
 /**
- * Metadata properties
+ * Metadata properties for indexes
  */
-export interface MetadataProperties {
+export interface IndexMetadataProperties {
   /** Field name */
-  field?: string
+  field?: IndexField
   /** Index options */
   options?: IndexOptions
 }
 
-// _documentLocks globalThis
+/**
+ * Document locks for concurrency control
+ */
 export interface DocumentLocks {
-  [key: string]: boolean
+  [documentId: string]: boolean
 }
 
-// Create empty index structure
-// this.indices[indexKey] = {
-//   field,
-//   isCompound,
-//   unique: options.unique === true,
-//   sparse: options.sparse === true,
-//   entries: {}, // Map of values to document IDs
-//   metadata: {
-//     created: new Date(),
-//     updated: new Date(),
-//     name:
-//       options.name ||
-//       (isCompound ? `idx_${field.join('_')}` : `idx_${field}`),
-//     ...options
-//   }
-// }
+/**
+ * Index structure
+ */
+export interface Index extends IndexMetadataProperties {
+  /** Index name */
+  name: string
+  /** Whether the index is compound */
+  isCompound: boolean
+  /** Whether the index enforces uniqueness */
+  unique: boolean
+  /** Whether the index is sparse */
+  sparse: boolean
+  /** Entries for the index */
+  entries: Record<string, string[]>
+  /** Metadata for the index */
+  metadata: Record<string, any>
+}
 
 /**
  * Index options
@@ -87,7 +99,7 @@ export interface IndexOptions {
   /** Index name */
   name?: string
   /** Field name */
-  field?: string | string[]
+  field?: IndexField
   /** Whether the index is compound */
   isCompound?: boolean
   /** Whether the index enforces uniqueness */
@@ -98,7 +110,7 @@ export interface IndexOptions {
   entries?: Record<string, string[]>
   /** Metadata for the index */
   metadata?: Record<string, any>
-  /** Index options */
+  /** Nested index options */
   options?: IndexOptions
 }
 
@@ -118,7 +130,7 @@ export interface CollectionOptions {
  * Collection metadata
  */
 export interface CollectionMetadata {
-  /** Collection name */
+  /** Number of documents in the collection */
   count: number
   /** Indices for the collection */
   indices: IndexOptions[]
@@ -131,7 +143,7 @@ export interface CollectionMetadata {
 }
 
 /**
- * Index definition
+ * Index definition for creating indexes
  */
 export interface IndexDefinition {
   /** Fields included in the index */
@@ -143,7 +155,7 @@ export interface IndexDefinition {
 }
 
 /**
- * Document with required _id field
+ * Base document structure
  */
 export interface Document {
   /** Document unique identifier */
@@ -151,20 +163,33 @@ export interface Document {
   [key: string]: any
 }
 
+/**
+ * Document with guaranteed ID field
+ */
 export interface DocumentWithId extends Document {
   _id: string
 }
+
+/**
+ * Supported schema field types
+ */
+export type SchemaFieldType = 'string' | 'number' | 'boolean' | 'date' | 'object' | 'array'
+
+/**
+ * Default value generator function
+ */
+export type DefaultValueGenerator = (doc: Document, field: string) => unknown
 
 /**
  * Schema field definition
  */
 export interface SchemaFieldDefinition {
   /** Data type */
-  type: 'string' | 'number' | 'boolean' | 'date' | 'object' | 'array'
+  type: SchemaFieldType
   /** Whether the field is required */
   required?: boolean
   /** Default value or function to generate default */
-  default?: any | ((doc: any, field: string) => any)
+  default?: unknown | DefaultValueGenerator
   /** Validation rules */
   validate?: ValidationRules
   /** Transform function to modify the value */
@@ -189,6 +214,11 @@ export interface SchemaOptions {
 }
 
 /**
+ * Custom validation function type
+ */
+export type CustomValidator = (value: any, doc?: Document) => boolean | string | Promise<boolean | string>
+
+/**
  * Validation rules for schema fields
  */
 export interface ValidationRules {
@@ -203,9 +233,9 @@ export interface ValidationRules {
   /** Regular expression pattern for strings */
   pattern?: RegExp
   /** Enumerated allowed values */
-  enum?: any[]
+  enum?: unknown[]
   /** Custom validation function that can return a boolean or an error message */
-  custom?: (value: any, doc?: any) => boolean | string | Promise<boolean | string>
+  custom?: CustomValidator
   /** Custom error message for validation failures */
   message?: string
 }
@@ -216,36 +246,46 @@ export interface ValidationRules {
 export type QueryCriteria = Record<string, any>
 
 /**
+ * Sort direction
+ */
+export type SortDirection = 1 | -1
+
+/**
  * Sort options for query results
  */
-export type SortOptions = Record<string, 1 | -1>
+export type SortOptions = Record<string, SortDirection>
+
+/**
+ * Projection value
+ */
+export type ProjectionValue = 1 | 0
 
 /**
  * Field selection for query results
  */
-export type SelectFields = Record<string, 1 | 0> | string[]
+export type SelectFields = Record<string, ProjectionValue> | string[]
 
 /**
  * Update operations for modifying documents
  */
 export interface UpdateOperations {
   /** Fields to set with new values */
-  $set?: Record<string, any>
+  $set?: Record<string, unknown>
   /** Fields to increment by specified amount */
   $inc?: Record<string, number>
   /** Fields to multiply by specified amount */
   $mul?: Record<string, number>
   /** Fields to remove */
-  $unset?: Record<string, any>
+  $unset?: Record<string, unknown>
   /** Elements to add to arrays if not already present */
-  $addToSet?: Record<string, any>
+  $addToSet?: Record<string, unknown>
   /** Elements to push to arrays */
-  $push?: Record<string, any>
+  $push?: Record<string, unknown>
   /** Elements to pull from arrays */
-  $pull?: Record<string, any>
+  $pull?: Record<string, unknown>
   /** Elements to pop from arrays (1 for last, -1 for first) */
-  $pop?: Record<string, 1 | -1>
-  [key: string]: any
+  $pop?: Record<string, SortDirection>
+  [key: string]: unknown
 }
 
 /**
@@ -259,41 +299,43 @@ export interface FindOptions {
   /** Fields to sort by */
   sort?: SortOptions
   /** Fields to include or exclude */
-  projection?: Record<string, 1 | 0>
+  projection?: Record<string, ProjectionValue>
+}
+
+/**
+ * Base result interface for database operations
+ */
+export interface OperationResult {
+  /** Indicates if the operation was acknowledged */
+  acknowledged: boolean
 }
 
 /**
  * Result of an update operation
  */
-export interface UpdateResult {
+export interface UpdateResult extends OperationResult {
   /** Number of documents matched */
   matchedCount: number
   /** Number of documents modified */
   modifiedCount: number
-  /** Indicates if the operation was acknowledged */
-  acknowledged: boolean
 }
 
 /**
  * Result of a delete operation
  */
-export interface DeleteResult {
+export interface DeleteResult extends OperationResult {
   /** Number of documents deleted */
   deletedCount: number
-  /** Indicates if the operation was acknowledged */
-  acknowledged: boolean
 }
 
 /**
  * Result of an insert operation
  */
-export interface InsertResult {
+export interface InsertResult extends OperationResult {
   /** Number of documents inserted */
   insertedCount: number
   /** IDs of inserted documents */
   insertedIds: string[]
-  /** Indicates if the operation was acknowledged */
-  acknowledged: boolean
 }
 
 /**
@@ -323,7 +365,7 @@ export interface Query {
   /** Fields to select */
   selectFields: SelectFields | null
   /** Checks if a document matches the criteria */
-  matches: (doc: Record<string, any>) => boolean
+  matches: (doc: Record<string, unknown>) => boolean
   /** Sets sort options */
   sort: (sortBy: SortOptions) => Query
   /** Sets limit value */
@@ -333,5 +375,5 @@ export interface Query {
   /** Sets fields to select */
   select: (fields: SelectFields) => Query
   /** Executes the query on a collection of documents */
-  execute: (documents: Array<Record<string, any>>) => Array<Record<string, any>>
+  execute: (documents: Array<Record<string, unknown>>) => Array<Record<string, unknown>>
 }

@@ -25,7 +25,8 @@ import {
   DocumentLocks,
   DocumentWithId,
   Schema,
-  IndexOptions
+  IndexOptions,
+  Index
 } from '../types/index.js'
 
 const mkdirPromise = promisify(fs.mkdir)
@@ -921,9 +922,9 @@ export class Collection {
 
   /**
    * List all the indices in the collection
-   * @returns {Promise<IndexOptions[]>} - List of indices
+   * @returns {Promise<Index[]>} - List of indices
    */
-  async listIndexes (): Promise<IndexOptions[]> {
+  async listIndexes (): Promise<Index[]> {
     try {
       const indices = []
       for (const key in this.indexManager.indices) {

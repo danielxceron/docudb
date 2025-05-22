@@ -54,7 +54,7 @@ class IndexManager {
    * Creates an index for a specific field
    * @param {string} collectionName - Collection name
    * @param {string} field - Field to index
-   * @param {Object} options - Index options
+   * @param {IndexOptions} options - Index options
    * @returns {Promise<void>}
    */
   async createIndex (collectionName: string, field: string | string[], options: IndexOptions = {}): Promise<boolean> {
