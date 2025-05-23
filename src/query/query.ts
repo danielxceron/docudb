@@ -135,7 +135,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if the document matches the criteria
    * @private
    */
-  _evaluateCriteria (doc: Document, criteria: QueryCriteria): boolean {
+  _evaluateCriteria (doc: Document, criteria: QueryCriteria = {}): boolean {
     // If criteria is null or undefined, always matches
     if (criteria == null) return true
 

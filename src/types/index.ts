@@ -12,7 +12,9 @@ export type IdType = 'mongo' | 'uuid'
  * Common configuration options shared across components
  */
 export interface CommonOptions {
-  /** Directory to store data */
+  /** Directory to store data
+   * @default './data'
+  */
   dataDir: string
 }
 
@@ -20,13 +22,24 @@ export interface CommonOptions {
  * Database configuration options
  */
 export interface DatabaseOptions extends Partial<CommonOptions> {
-  /** Database name */
+  /** Database name
+   * @default 'docudb'
+  */
   name?: string
-  /** Maximum chunk size in bytes */
+
+  /** Maximum chunk size in bytes
+   * @default 1024
+  */
   chunkSize?: number
-  /** Indicates if compression should be used */
+
+  /** Indicates if compression should be used
+   * @default false
+  */
   compression?: boolean
-  /** ID generation type: 'mongo' or 'uuid' */
+
+  /** ID generation type: 'mongo' or 'uuid'
+   * @default 'mongo'
+  */
   idType?: IdType
 }
 
@@ -243,13 +256,12 @@ export interface ValidationRules {
 /**
  * Query criteria for filtering documents
 */
-// export type QueryCriteria = Record<string, any>
 export interface QueryCriteria extends QueryOperator {
   [key: string]: any | QueryCriteria
 }
 
 export interface QueryOperator {
-  /** Special operators */
+  /** Logical operators */
 
   /** Or operator
    * @description Logical OR operator
@@ -266,6 +278,7 @@ export interface QueryOperator {
   /** Not operator
    * @description Logical NOT operator
    * @example { $not: { name: 'John' } }
+   * @example { $not: { name: { $eq: 'John' } } }
    */
   $not?: QueryCriteria
 

@@ -322,6 +322,18 @@ describe('DocuDB - Query Operations', () => {
       expect(results.map(p => p.name)).to.have.members(['Mouse', 'Tablet'])
     })
 
+    it('should handle $not operator', async () => {
+      const query = new Query({
+        $not: { price: { $lt: 30 } }
+      })
+
+      const results = await productos.find(query)
+      expect(results).to.have.lengthOf(4)
+      expect(results.map(p => p.name)).to.have.members(
+        ['Laptop', 'Keyboard', 'Monitor', 'Tablet']
+      )
+    })
+
     it('should handle sorting', async () => {
       const query = new Query({}).sort({ price: 1 })
       const results = await productos.find(query)
