@@ -7,6 +7,8 @@
  * Database error codes
  */
 export interface DatabaseErrorCodes {
+  NOT_INITIALIZED: string
+  INVALID_NAME: string
   LOAD_ERROR: any
   COLLECTION_ERROR: any
   /** Error during database initialization */
@@ -140,6 +142,7 @@ export interface ErrorCodes {
 // Error codes organized by module
 const MCO_ERROR: ErrorCodes = {
   DATABASE: {
+    INVALID_NAME: 'DB000',
     INIT_ERROR: 'DB001',
     COLLECTION_NOT_FOUND: 'DB002',
     INVALID_COLLECTION_NAME: 'DB003',
@@ -150,6 +153,7 @@ const MCO_ERROR: ErrorCodes = {
     INVALID_QUERY: 'DB008',
     INVALID_UPDATE: 'DB009',
     TRANSACTION_ERROR: 'DB010',
+    NOT_INITIALIZED: 'DB011',
     LOAD_ERROR: undefined,
     COLLECTION_ERROR: undefined
   },
@@ -234,7 +238,7 @@ class DocuDBError extends Error {
     this.timestamp = new Date()
 
     // Capture stack trace
-    if (Error.captureStackTrace) {
+    if (Error.captureStackTrace !== undefined) {
       Error.captureStackTrace(this, DocuDBError)
     }
   }

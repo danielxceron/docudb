@@ -30,6 +30,8 @@ import {
   QueryCriteria
 } from '../types/index.js'
 
+import { validatePath, sanitizeName } from '../utils/pathValidator.js'
+
 const mkdirPromise = promisify(fs.mkdir)
 const readFilePromise = promisify(fs.readFile)
 const writeFilePromise = promisify(fs.writeFile)
@@ -49,19 +51,31 @@ class Database {
   public storage: FileStorage
   /** Index manager instance */
   public indexManager: IndexManager
+  /** Database Initialized */
+  public initialized: boolean
 
   /**
    * Creates a new database instance
    * @param options - Configuration options
    */
   constructor (options: DatabaseOptions = {}) {
+    this.initialized = false
     this.name = options.name ?? 'docudb'
-    this.dataDir = path.join(
-      options.dataDir ?? process.cwd(),
-      'data',
-      this.name
-    )
     this.collections = {}
+    // ID generation options
+    this.idType = options.idType ?? 'mongo' // 'mongo' or 'uuid'
+
+    this.dataDir = path.join(options.dataDir ?? process.cwd(), 'data')
+    const validate = validatePath(this.name, this.dataDir)
+
+    if (validate.safePath === null) {
+      throw new DocuDBError(
+      `Invalid database name: ${validate.error ?? ''}`,
+      MCO_ERROR.DATABASE.INVALID_NAME
+      )
+    }
+
+    this.dataDir = validate.safePath
 
     // Storage options
     this.storageOptions = {
@@ -69,9 +83,6 @@ class Database {
       chunkSize: options.chunkSize ?? 1024 * 1024, // 1MB default
       compression: options.compression !== false
     }
-
-    // ID generation options
-    this.idType = options.idType ?? 'mongo' // 'mongo' or 'uuid'
 
     this.storage = new FileStorage(this.storageOptions)
     this.indexManager = new IndexManager({ dataDir: this.dataDir })
@@ -81,20 +92,8 @@ class Database {
    * Initializes the database
    * @returns {Promise<void>}
    */
-  async initialize (): Promise<void> {
+  public async initialize (): Promise<void> {
     try {
-      // Validate that database name is valid for a directory
-      if (
-        this.name.includes('/') ||
-        this.name.includes('\\') ||
-        this.name.includes(':')
-      ) {
-        throw new DocuDBError(
-          'Invalid database name: contains characters not allowed for directories',
-          MCO_ERROR.DATABASE.INIT_ERROR
-        )
-      }
-
       // Create data directory if it doesn't exist
       if (!(await fileExists(this.dataDir))) {
         try {
@@ -113,6 +112,7 @@ class Database {
 
       // Load existing collections metadata
       await this._loadCollections()
+      this.initialized = true
     } catch (error: any) {
       throw new DocuDBError(
         `Error initializing database: ${(error as Error).message}`,
@@ -125,13 +125,20 @@ class Database {
   /**
    * Gets a collection
    * @param {string} collectionName - Collection name
-   * @param {Object} options - Collection options
+   * @param {CollectionOptions} options - Collection options
    * @returns {Collection} - Collection instance
    */
-  collection (
+  public collection (
     collectionName: string,
     options: CollectionOptions = { idType: this.idType }
   ): Collection {
+    if (!this.initialized) {
+      throw new DocuDBError(
+        'Database not initialized',
+        MCO_ERROR.DATABASE.NOT_INITIALIZED
+      )
+    }
+
     if (typeof collectionName !== 'string' || collectionName === '') {
       throw new DocuDBError(
         'Collection name must be a valid string',
@@ -163,8 +170,15 @@ class Database {
    * @param {string} collectionName - Name of collection to drop
    * @returns {Promise<boolean>} - true if successfully dropped
    */
-  async dropCollection (collectionName: string): Promise<boolean> {
+  public async dropCollection (collectionName: string): Promise<boolean> {
     try {
+      if (!this.initialized) {
+        throw new DocuDBError(
+          'Database not initialized',
+          MCO_ERROR.DATABASE.NOT_INITIALIZED
+        )
+      }
+
       if (typeof this.collections[collectionName] !== 'object') {
         return false
       }
@@ -202,8 +216,15 @@ class Database {
    * Lists all collections
    * @returns {Promise<string[]>} - Collection names
    */
-  async listCollections (): Promise<string[]> {
+  public async listCollections (): Promise<string[]> {
     try {
+      if (!this.initialized) {
+        throw new DocuDBError(
+          'Database not initialized',
+          MCO_ERROR.DATABASE.NOT_INITIALIZED
+        )
+      }
+
       return Object.keys(this.collections)
     } catch (error: any) {
       throw new DocuDBError(
@@ -218,7 +239,7 @@ class Database {
    * Loads existing collections
    * @private
    */
-  async _loadCollections (): Promise<void> {
+  private async _loadCollections (): Promise<void> {
     try {
       // Read directories in data directory
       const items = await promisify(fs.readdir)(this.dataDir, {
@@ -293,6 +314,23 @@ export class Collection {
    */
   async initialize (): Promise<void> {
     try {
+      try {
+        // Validate that collection name is valid for a directory
+        const sanitizedName = sanitizeName(this.name)
+        if (sanitizedName.safePath === null) {
+          throw new Error(
+            `Invalid collection name: ${sanitizedName.error ?? ''}`
+          )
+        } else {
+          this.name = sanitizedName.safePath
+        }
+      } catch (error) {
+        throw new DocuDBError(
+          `Invalid collection name: ${(error as Error).message}`,
+          MCO_ERROR.COLLECTION.INVALID_NAME
+        )
+      }
+
       // Create collection directory if it doesn't exist
       await this.storage._ensureCollectionDir(this.name)
 
@@ -644,7 +682,10 @@ export class Collection {
       const maxRetries = 10
       const retryDelay = 50 // ms
 
-      while ((global as any)._documentLocks[lockKey] !== undefined && retries < maxRetries) {
+      while (
+        (global as any)._documentLocks[lockKey] !== undefined &&
+        retries < maxRetries
+      ) {
         await new Promise(resolve =>
           setTimeout(resolve, retryDelay * (1 + Math.random()))
         )
@@ -670,7 +711,10 @@ export class Collection {
         )
 
         // Delete old chunks if different
-        if (JSON.stringify(this.documents[id].chunkPaths) !== JSON.stringify(chunkPaths)) {
+        if (
+          JSON.stringify(this.documents[id].chunkPaths) !==
+          JSON.stringify(chunkPaths)
+        ) {
           await this.storage.deleteChunks(this.documents[id].chunkPaths)
         }
 
@@ -879,7 +923,10 @@ export class Collection {
    * @param {Object} options - Index options
    * @returns {Promise<boolean>} - true if successfully created
    */
-  async createIndex (field: string | string[], options: IndexOptions = {}): Promise<boolean> {
+  async createIndex (
+    field: string | string[],
+    options: IndexOptions = {}
+  ): Promise<boolean> {
     try {
       // Create index
       await this.indexManager.createIndex(this.name, field, options)
