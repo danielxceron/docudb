@@ -166,13 +166,33 @@ describe('DocuDB - CRUD Operations', () => {
       const producto = await productos.insertOne({
         name: 'Headphones', price: 50, stock: 10
       })
+
+      await productos.insertMany([
+        { name: 'Mouse', price: 20, stock: 10 },
+        { name: 'Keyboard', price: 50, stock: 8 },
+        { name: 'Monitor', price: 150, stock: 3 }
+      ])
       productoId = producto._id
     })
 
-    it('should delete a document', async () => {
+    it('should delete a document by id', async () => {
       await productos.deleteById(productoId)
       const count = await productos.count()
-      expect(count).to.equal(0)
+      expect(count).to.equal(3)
+    })
+
+    it('should delete the first document found', async () => {
+      const deleted = await productos.deleteOne({ name: 'Mouse' })
+      expect(deleted).to.be.true
+      const count = await productos.count()
+      expect(count).to.equal(3)
+    })
+
+    it('should delete all documents matching criteria', async () => {
+      const deletedCount = await productos.deleteMany({ price: { $gte: 50 } })
+      expect(deletedCount).to.equal(3)
+      const count = await productos.count()
+      expect(count).to.equal(1)
     })
   })
 })

@@ -55,7 +55,8 @@
     },
     "ignorePatterns": ["dist/**/*"],
     "rules": {
-      "no-unused-expressions": "off"
+      "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/no-dynamic-delete": "off"
     }
   }
 }

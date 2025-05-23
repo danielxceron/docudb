@@ -26,7 +26,8 @@ import {
   DocumentWithId,
   Schema,
   IndexOptions,
-  Index
+  Index,
+  QueryCriteria
 } from '../types/index.js'
 
 const mkdirPromise = promisify(fs.mkdir)
@@ -517,10 +518,10 @@ export class Collection {
 
   /**
    * Finds documents matching criteria
-   * @param {Object} criteria - Search criteria
+   * @param {QueryCriteria} criteria - Search criteria
    * @returns {Promise<Document[]>} - Found documents
    */
-  async find (criteria = {}): Promise<DocumentWithId[]> {
+  async find (criteria: QueryCriteria = {}): Promise<DocumentWithId[]> {
     try {
       const query = criteria instanceof Query ? criteria : new Query(criteria)
       // Try to use indices to optimize search
@@ -544,10 +545,10 @@ export class Collection {
 
   /**
    * Finds one document matching criteria
-   * @param {Object} criteria - Search criteria
+   * @param {QueryCriteria} criteria - Search criteria
    * @returns {Promise<Object|null>} - Found document or null
    */
-  async findOne (criteria = {}): Promise<DocumentWithId | null> {
+  async findOne (criteria: QueryCriteria = {}): Promise<DocumentWithId | null> {
     try {
       const results = await this.find(criteria)
       return results.length > 0 ? results[0] : null
@@ -703,12 +704,12 @@ export class Collection {
 
   /**
    * Updates documents matching criteria
-   * @param {Object} criteria - Search criteria
+   * @param {QueryCriteria} criteria - Search criteria
    * @param {Object} update - Changes to apply
    * @returns {Promise<number>} - Number of documents updated
    */
   async updateMany (
-    criteria: object,
+    criteria: QueryCriteria,
     update: UpdateOperations
   ): Promise<number> {
     try {
@@ -809,11 +810,24 @@ export class Collection {
   }
 
   /**
+   * Deletes the first document found with the query criteria
+   * @param {QueryCriteria} criteria - Search criteria
+   * @returns {Promise<boolean>} - true if successfully deleted
+   */
+  async deleteOne (criteria: QueryCriteria): Promise<boolean> {
+    const result = await this.findOne(criteria)
+    if (result === null) {
+      return false
+    }
+    return await this.deleteById(result._id)
+  }
+
+  /**
    * Deletes documents matching criteria
-   * @param {Object} criteria - Search criteria
+   * @param {QueryCriteria} criteria - Search criteria
    * @returns {Promise<number>} - Number of documents deleted
    */
-  async deleteMany (criteria: object): Promise<number> {
+  async deleteMany (criteria: QueryCriteria): Promise<number> {
     try {
       // Find matching documents
       const docs = await this.find(criteria)
@@ -837,10 +851,10 @@ export class Collection {
 
   /**
    * Counts documents matching criteria
-   * @param {Object} criteria - Search criteria
+   * @param {QueryCriteria} criteria - Search criteria
    * @returns {Promise<number>} - Number of documents
    */
-  async count (criteria = {}): Promise<number> {
+  async count (criteria: QueryCriteria = {}): Promise<number> {
     try {
       if (Object.keys(criteria).length === 0) {
         // If no criteria, return metadata counter

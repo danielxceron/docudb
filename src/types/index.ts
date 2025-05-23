@@ -242,8 +242,114 @@ export interface ValidationRules {
 
 /**
  * Query criteria for filtering documents
- */
-export type QueryCriteria = Record<string, any>
+*/
+// export type QueryCriteria = Record<string, any>
+export interface QueryCriteria extends QueryOperator {
+  [key: string]: any | QueryCriteria
+}
+
+export interface QueryOperator {
+  /** Special operators */
+
+  /** Or operator
+   * @description Logical OR operator
+   * @example { $or: [{ name: 'John' }, { age: { $gt: 30 } }] }
+   */
+  $or?: QueryCriteria[]
+
+  /** And operator
+   * @description Logical AND operator
+   * @example { $and: [{ name: 'John', age: { $gt: 30 } }, { city: 'New York' }] }
+   */
+  $and?: QueryCriteria[]
+
+  /** Not operator
+   * @description Logical NOT operator
+   * @example { $not: { name: 'John' } }
+   */
+  $not?: QueryCriteria
+
+  /** Array of values */
+
+  /** In operator
+   * @description Matches any of the values in the array
+   * @example { $in: ['John', 'Jane'] }
+   */
+  $in?: any[]
+
+  /** Not in operator
+   * @description Matches none of the values in the array
+   * @example { $nin: ['John', 'Jane'] }
+   */
+  $nin?: any[]
+
+  /** Comparison operators */
+
+  /** Equal operator (=)
+   * @description Matches documents where the value of the field is equal to the specified value
+   * @example
+   * { name: { $eq: 'John' }, age: { $eq: 30 } }
+   */
+  $eq?: any
+
+  /** Not equal operator (!=)
+   * @description Matches documents where the value of the field is not equal to the specified value
+   * @example { $ne: 'John' }
+   */
+  $ne?: any
+
+  /** Greater than operator (>)
+   * @description Matches documents where the value of the field is greater than the specified value
+   * Similar to the greater than operator in SQL
+   * @example { age: { $gt: 30 } }
+   */
+  $gt?: any
+
+  /** Greater than or equal operator (>=)
+   * @description Matches documents where the value of the field is greater than or equal to the specified value
+   * Similar to the greater than or equal operator in SQL
+   * @example { age: { $gte: 30 } }
+   */
+  $gte?: any
+
+  /** Less than operator (<)
+   * @description Matches documents where the value of the field is less than the specified value
+   * Similar to the less than operator in SQL
+   * @example { age: { $lt: 30 } }
+   */
+  $lt?: any
+
+  /** Less than or equal operator (<=)
+   * @description Matches documents where the value of the field is less than or equal to the specified value
+   * Similar to the less than or equal operator in SQL
+   * @example { age: { $lte: 30 } }
+   */
+  $lte?: any
+
+  /** Existence operator
+   * @description Matches documents where the specified field exists
+   * @example { name: { $exists: true } }
+   */
+  $exists?: boolean
+
+  /** Regular expression operator
+   * @description Matches documents where the value of the field matches the specified regular expression
+   * @example { name: { $regex: /John/ } }
+   */
+  $regex?: RegExp
+
+  /** Size operator
+   * @description Matches documents where the value of the field is an array and has the specified size
+   * @example { tags: { $size: 2 } }
+   */
+  $size?: number
+
+  /** All operator
+   * @description Matches documents where the value of the field is an array and contains all the specified values
+   * @example { tags: { $all: ['tag1', 'tag2'] } }
+   */
+  $all?: any[]
+}
 
 /**
  * Sort direction

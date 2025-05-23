@@ -273,6 +273,51 @@ const result = await products.updateMany(
 );
 ```
 
+## Delete Operations
+
+DocuDB provides several methods for deleting documents from your collections. This section covers all available delete operations with practical examples.
+
+### Available Delete Methods
+
+`deleteById(id)` `deleteOne(filter)` `deleteMany(filter)`
+
+```typescript
+// Insert a document first
+const product = await products.insertOne({
+  name: 'Headphones',
+  price: 50,
+  stock: 10
+});
+
+// Delete the document by its ID
+const deleted = await products.deleteById(product._id);
+console.log(deleted); // true
+
+// Verify deletion
+const found = await products.findById(product._id);
+console.log(found); // null
+
+await products.insertMany([
+  { name: 'Mouse', price: 20, stock: 10 },
+  { name: 'Keyboard', price: 50, stock: 8 },
+  { name: 'Monitor', price: 150, stock: 3 }
+]);
+
+// Delete the first document matching the criteria
+const deleted = await products.deleteOne({ name: 'Mouse' });
+console.log(deleted); // true
+
+// Check remaining count
+const count = await products.count();
+console.log(count); // 2 (only Mouse was deleted)
+
+// Delete all products with price >= 50
+const deletedCount = await products.deleteMany({ 
+  price: { $gte: 50 } 
+});
+console.log(deletedCount); // 2 (Keyboard, Monitor)
+```
+
 ## Indexing
 
 Create indexes to improve query performance:

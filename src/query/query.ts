@@ -131,7 +131,7 @@ class Query implements QueryInterface {
   /**
    * Recursively evaluates query criteria
    * @param {Object} doc - Document to evaluate
-   * @param {Object} criteria - Query criteria
+   * @param {QueryCriteria} criteria - Query criteria
    * @returns {boolean} - true if the document matches the criteria
    * @private
    */
