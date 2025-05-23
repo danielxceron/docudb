@@ -43,7 +43,7 @@ class IndexManager {
       // Load existing indices
       await this._loadIndices(collectionName)
     } catch (error: any) {
-      throw new DocuDBError(`Error initializing indices: ${error.message}`, MCO_ERROR.INDEX.INIT_ERROR, {
+      throw new DocuDBError(`Error initializing indices: ${(error as Error).message}`, MCO_ERROR.INDEX.INIT_ERROR, {
         collectionName,
         originalError: error
       })
@@ -65,7 +65,7 @@ class IndexManager {
         ? `${collectionName}:${field.join('+')}`
         : `${collectionName}:${field}`
 
-      if (this.indices[indexKey]) {
+      if (this.indices[indexKey] !== undefined) {
         return true // Index already exists
       }
 
@@ -86,7 +86,7 @@ class IndexManager {
           created: new Date(),
           updated: new Date(),
           name:
-            options.name ||
+            options.name ??
             (isCompound ? `idx_${field.join('_')}` : `idx_${field}`),
           ...options
         }
@@ -99,7 +99,7 @@ class IndexManager {
       )
       return true
     } catch (error: any) {
-      throw new DocuDBError(`Error creating index: ${error.message}`, MCO_ERROR.INDEX.CREATE_ERROR, {
+      throw new DocuDBError(`Error creating index: ${(error as Error).message}`, MCO_ERROR.INDEX.CREATE_ERROR, {
         collectionName,
         field,
         options,
@@ -117,7 +117,7 @@ class IndexManager {
   async dropIndex (collectionName: string, field: string): Promise<void> {
     try {
       const indexKey = `${collectionName}:${field}`
-      if (!this.indices[indexKey]) {
+      if (this.indices[indexKey] === undefined) {
         return // Index doesn't exist
       }
 
@@ -130,7 +130,7 @@ class IndexManager {
         await promisify(fs.unlink)(indexPath)
       }
     } catch (error: any) {
-      throw new DocuDBError(`Error dropping index: ${error.message}`, MCO_ERROR.INDEX.DROP_ERROR, {
+      throw new DocuDBError(`Error dropping index: ${(error as Error).message}`, MCO_ERROR.INDEX.DROP_ERROR, {
         collectionName,
         field,
         originalError: error
@@ -155,7 +155,7 @@ class IndexManager {
           // Get field value from document
           let value
 
-          if (index.isCompound) {
+          if (index.isCompound === true) {
             // For compound indices, create a composite key
             const values = []
             for (const f of field) {
@@ -168,14 +168,14 @@ class IndexManager {
           }
 
           // If value is undefined and index is sparse, skip
-          if (value === undefined && index.sparse) {
+          if (value === undefined && index.sparse === undefined) {
             continue
           }
 
           // Check uniqueness if needed
-          if (index.unique && value !== undefined) {
+          if (index.unique === true && value !== undefined) {
             const existingId = this._findDocIdByValue(index, value)
-            if (existingId && existingId !== docId) {
+            if (existingId !== null && existingId !== docId) {
               throw new Error(
                 `Unique Index Violation: Duplicate value for ${index.isCompound ? 'compound index' : field}`
               )
@@ -188,7 +188,7 @@ class IndexManager {
           // Add new entry
           if (value !== undefined) {
             const valueKey = this._getValueKey(value)
-            if (!index.entries[valueKey]) {
+            if (index.entries[valueKey] === undefined) {
               index.entries[valueKey] = []
             }
             index.entries[valueKey].push(docId)
@@ -202,19 +202,19 @@ class IndexManager {
       // Save updated indices
       await this._saveAllIndices(collectionName)
     } catch (error: any) {
-      if (error.message.includes('Unique Index Violation')) {
+      if ((error as Error).message.includes('Unique Index Violation')) {
         throw new DocuDBError(
           'Duplicate value in field with unique index',
           MCO_ERROR.INDEX.UNIQUE_VIOLATION,
           {
             collectionName,
             docId,
-            field: error.message.includes('compound index') ? 'compound index' : error.message.split('for ')[1],
+            field: (error as Error).message.includes('compound index') ? 'compound index' : (error as Error).message.split('for ')[1],
             originalError: error
           }
         )
       }
-      throw new DocuDBError(`Error updating index: ${error.message}`, MCO_ERROR.INDEX.UPDATE_ERROR, {
+      throw new DocuDBError(`Error updating index: ${(error as Error).message}`, MCO_ERROR.INDEX.UPDATE_ERROR, {
         collectionName,
         docId,
         originalError: error
@@ -248,7 +248,7 @@ class IndexManager {
       }
     } catch (error: any) {
       throw new DocuDBError(
-        `Error removing document from indices: ${error.message}`,
+        `Error removing document from indices: ${(error as Error).message}`,
         MCO_ERROR.INDEX.UPDATE_ERROR,
         {
           collectionName,
@@ -270,12 +270,12 @@ class IndexManager {
     const indexKey = `${collectionName}:${field}`
     const index = this.indices[indexKey]
 
-    if (!index) {
+    if (index !== undefined) {
       return null // No index for this field
     }
 
     const valueKey = this._getValueKey(value)
-    return index.entries[valueKey] || []
+    return index.entries[valueKey] ?? []
   }
 
   /**
@@ -286,7 +286,7 @@ class IndexManager {
    */
   hasIndex (collectionName: string, field: string): boolean {
     const indexKey = `${collectionName}:${field}`
-    return !!this.indices[indexKey]
+    return Boolean(this.indices[indexKey])
   }
 
   /**
@@ -336,7 +336,7 @@ class IndexManager {
         }
       }
     } catch (error: any) {
-      throw new DocuDBError(`Error loading indices: ${error.message}`, MCO_ERROR.INDEX.LOAD_ERROR, {
+      throw new DocuDBError(`Error loading indices: ${(error as Error).message}`, MCO_ERROR.INDEX.LOAD_ERROR, {
         collectionName,
         originalError: error
       })
@@ -355,7 +355,7 @@ class IndexManager {
       const indexKey = `${collectionName}:${field}`
       const index = this.indices[indexKey]
 
-      if (!index) return
+      if (index === undefined) return
 
       // Ensure index directory exists
       const indexDir = this._getIndexDir(collectionName)
@@ -379,15 +379,13 @@ class IndexManager {
           const metadata = JSON.parse(metadataRaw) as Metadata
 
           // Check if index is already registered
-          const indexExists =
-            metadata.indices &&
-            metadata.indices.some((idx) => idx.field === field)
+          const indexExists = metadata.indices?.some((idx) => idx.field === field)
 
           if (!indexExists) {
-            if (!metadata.indices) metadata.indices = []
+            if (metadata.indices === undefined) metadata.indices = []
             metadata.indices.push({
               field,
-              options: index.metadata || {}
+              options: index.metadata ?? {}
             })
             await writeFilePromise(
               metadataPath,
@@ -397,12 +395,12 @@ class IndexManager {
           }
         } catch (metaError: any) {
           console.error(
-            `Error updating metadata for index: ${metaError.message}`
+            `Error updating metadata for index: ${(metaError as Error).message}`
           )
         }
       }
     } catch (error: any) {
-      throw new DocuDBError(`Error saving index: ${error.message}`, MCO_ERROR.INDEX.SAVE_ERROR, {
+      throw new DocuDBError(`Error saving index: ${(error as Error).message}`, MCO_ERROR.INDEX.SAVE_ERROR, {
         collectionName,
         field,
         originalError: error
@@ -425,7 +423,7 @@ class IndexManager {
         }
       }
     } catch (error: any) {
-      throw new DocuDBError(`Error saving indices: ${error.message}`, MCO_ERROR.INDEX.SAVE_ERROR, {
+      throw new DocuDBError(`Error saving indices: ${(error as Error).message}`, MCO_ERROR.INDEX.SAVE_ERROR, {
         collectionName,
         originalError: error
       })
@@ -474,7 +472,7 @@ class IndexManager {
     const valueKey = this._getValueKey(value)
     const docIds = index.entries[valueKey]
 
-    return docIds && docIds.length > 0 ? docIds[0] : null
+    return docIds?.length > 0 ? docIds[0] : null
   }
 
   /**
@@ -506,7 +504,7 @@ class IndexManager {
    * @private
    */
   _getNestedValue (obj: any, path: string): any {
-    if (!obj || !path) return undefined
+    if (obj === undefined || path === undefined) return undefined
 
     const parts = path.split('.')
     let current = obj

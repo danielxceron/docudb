@@ -33,8 +33,8 @@ class FileStorage {
    * @param options - Configuration options
    */
   constructor (options: StorageOptions) {
-    this.dataDir = options.dataDir || './data'
-    this.chunkSize = options.chunkSize || 1024 * 1024 // 1MB default
+    this.dataDir = options.dataDir ?? './data'
+    this.chunkSize = options.chunkSize ?? 1024 * 1024 // 1MB default
     this.useCompression = options.compression
     this.chunkExt = this.useCompression ? '.gz' : '.json'
   }
@@ -42,7 +42,7 @@ class FileStorage {
   /**
    * Initializes storage by creating necessary directories
    */
-  async initialize () {
+  async initialize (): Promise<void> {
     try {
       const exists = await fileExists(this.dataDir)
       if (!exists) {
@@ -50,7 +50,7 @@ class FileStorage {
       }
     } catch (error: any) {
       throw new DocuDBError(
-        `Error initializing storage: ${error.message}`,
+        `Error initializing storage: ${(error as Error).message}`,
         MCO_ERROR.STORAGE.INIT_ERROR,
         { originalError: error }
       )
@@ -104,7 +104,7 @@ class FileStorage {
       return chunkPaths
     } catch (error: any) {
       throw new DocuDBError(
-        `Error saving data: ${error.message}`,
+        `Error saving data: ${(error as Error).message}`,
         MCO_ERROR.STORAGE.SAVE_ERROR,
         { collectionName, originalError: error }
       )
@@ -132,7 +132,7 @@ class FileStorage {
       return JSON.parse(combinedData)
     } catch (error: any) {
       throw new DocuDBError(
-        `Error reading data: ${error.message}`,
+        `Error reading data: ${(error as Error).message}`,
         MCO_ERROR.STORAGE.READ_ERROR,
         { chunkPaths, originalError: error }
       )
@@ -143,7 +143,7 @@ class FileStorage {
    * Deletes a set of chunks
    * @param {string[]} chunkPaths - Paths of chunks to delete
    */
-  async deleteChunks (chunkPaths: string[]) {
+  async deleteChunks (chunkPaths: string[]): Promise<void> {
     try {
       for (const chunkPath of chunkPaths) {
         const exists = await fileExists(chunkPath)
@@ -154,7 +154,7 @@ class FileStorage {
       }
     } catch (error: any) {
       throw new DocuDBError(
-        `Error deleting chunks: ${error.message}`,
+        `Error deleting chunks: ${(error as Error).message}`,
         MCO_ERROR.STORAGE.DELETE_ERROR,
         { chunkPaths, originalError: error }
       )
@@ -166,7 +166,7 @@ class FileStorage {
    * @param {string} collectionName - Collection name
    * @private
    */
-  async _ensureCollectionDir (collectionName: string) {
+  async _ensureCollectionDir (collectionName: string): Promise<string> {
     const collectionDir = path.join(this.dataDir, collectionName)
     const exists = await fileExists(collectionDir)
     if (!exists) {
@@ -188,7 +188,7 @@ class FileStorage {
    * @returns {string} - Chunk path
    * @private
    */
-  _getChunkPath (collectionName: string, chunkIndex: number) {
+  _getChunkPath (collectionName: string, chunkIndex: number): string {
     return path.join(
       this.dataDir,
       collectionName,

@@ -20,7 +20,7 @@ async function compress (data: Buffer | string): Promise<Buffer> {
   try {
     return await gzipPromise(data)
   } catch (error: any) {
-    throw new DocuDBError(`Error compressing data: ${error.message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
+    throw new DocuDBError(`Error compressing data: ${(error as Error).message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
   }
 }
 
@@ -33,7 +33,7 @@ async function decompress (compressedData: Buffer): Promise<Buffer> {
   try {
     return await gunzipPromise(compressedData)
   } catch (error: any) {
-    throw new DocuDBError(`Error decompressing data: ${error.message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
+    throw new DocuDBError(`Error decompressing data: ${(error as Error).message}`, MCO_ERROR.COMPRESSION.COMPRESS_ERROR, { originalError: error })
   }
 }
 

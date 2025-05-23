@@ -19,7 +19,7 @@ function generateUUID (): string {
  * @returns True if the string is a valid UUID v4
  */
 function isValidUUID (uuid: string): boolean {
-  if (!uuid) return false
+  if (typeof uuid !== 'string') return false
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
   return regex.test(uuid)
 }
@@ -30,7 +30,7 @@ function isValidUUID (uuid: string): boolean {
  * @returns {boolean} - true if valid MongoDB-style ID, false otherwise
  */
 function isValidMongoID (id: string): boolean {
-  if (!id) return false
+  if (typeof id !== 'string') return false
   return /^[0-9a-f]{24}$/i.test(id)
 }
 

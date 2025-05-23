@@ -42,7 +42,7 @@ class Schema implements SchemaInterface {
    * @throws {DocuDBError} - If the document does not comply with the schema
    */
   validate (document: Document): Document {
-    if (!document || typeof document !== 'object') {
+    if (typeof document !== 'object') {
       throw new DocuDBError(
         'The document must be an object',
         MCO_ERROR.SCHEMA.INVALID_DOCUMENT
@@ -56,7 +56,7 @@ class Schema implements SchemaInterface {
       const value = document[field]
 
       // Check if the field is required
-      if (fieldDef.required && (value === undefined || value === null)) {
+      if (fieldDef.required === true && (value === undefined || value === null)) {
         throw new DocuDBError(
           `The '${field}' field is required`,
           MCO_ERROR.SCHEMA.REQUIRED_FIELD,
@@ -94,7 +94,7 @@ class Schema implements SchemaInterface {
         } catch (error: any) {
           throw new DocuDBError(
             error.message,
-            error.code || MCO_ERROR.SCHEMA.VALIDATION_ERROR,
+            error.code ?? MCO_ERROR.SCHEMA.VALIDATION_ERROR,
             { field, ...error.details }
           )
         }
@@ -112,7 +112,7 @@ class Schema implements SchemaInterface {
     }
 
     // In strict mode, verify there are no additional fields
-    if (this.options.strict) {
+    if (this.options?.strict === true) {
       for (const field in document) {
         if (!(field in this.definition) && !field.startsWith('_')) {
           throw new DocuDBError(
@@ -125,7 +125,7 @@ class Schema implements SchemaInterface {
     }
 
     // Add additional fields if not in strict mode
-    if (!this.options.strict) {
+    if (this.options?.strict !== true) {
       for (const field in document) {
         if (!(field in this.definition) && !field.startsWith('_')) {
           validatedDoc[field] = document[field]
@@ -134,9 +134,9 @@ class Schema implements SchemaInterface {
     }
 
     // Add timestamps if enabled
-    if (this.options.timestamps) {
+    if (this.options?.timestamps === true) {
       const now = new Date()
-      if (!document._createdAt) {
+      if (document?._createdAt === undefined) {
         validatedDoc._createdAt = now
       } else {
         validatedDoc._createdAt = document._createdAt
@@ -193,14 +193,14 @@ class Schema implements SchemaInterface {
     if (typeof value === 'number') {
       if ((validators.min !== undefined) && value < validators.min) {
         throw new DocuDBError(
-          validators.message || `The value must be greater than or equal to ${validators.min}`,
+          validators.message ?? `The value must be greater than or equal to ${validators.min}`,
           MCO_ERROR.SCHEMA.INVALID_VALUE,
           { field, value, min: validators.min }
         )
       }
       if ((validators.max !== undefined) && value > validators.max) {
         throw new DocuDBError(
-          validators.message || `The value must be less than or equal to ${validators.max}`,
+          validators.message ?? `The value must be less than or equal to ${validators.max}`,
           MCO_ERROR.SCHEMA.INVALID_VALUE,
           { field, value, max: validators.max }
         )
@@ -211,7 +211,7 @@ class Schema implements SchemaInterface {
     if (typeof value === 'string' || Array.isArray(value)) {
       if ((validators.minLength !== undefined) && value.length < validators.minLength) {
         throw new DocuDBError(
-          validators.message || `The length must be greater than or equal to ${validators.minLength}`,
+          validators.message ?? `The length must be greater than or equal to ${validators.minLength}`,
           MCO_ERROR.SCHEMA.INVALID_LENGTH,
           {
             field,
@@ -223,7 +223,7 @@ class Schema implements SchemaInterface {
       }
       if ((validators.maxLength !== undefined) && value.length > validators.maxLength) {
         throw new DocuDBError(
-          validators.message || `The length must be less than or equal to ${validators.maxLength}`,
+          validators.message ?? `The length must be less than or equal to ${validators.maxLength}`,
           MCO_ERROR.SCHEMA.INVALID_LENGTH,
           {
             field,
@@ -244,7 +244,7 @@ class Schema implements SchemaInterface {
 
       if (!pattern.test(value)) {
         throw new DocuDBError(
-          validators.message || 'Does not match the required pattern',
+          validators.message ?? 'Does not match the required pattern',
           MCO_ERROR.SCHEMA.INVALID_REGEX,
           { field, value, pattern: pattern.toString() }
         )
@@ -254,7 +254,7 @@ class Schema implements SchemaInterface {
     // Validate enum
     if (validators.enum != null && !validators.enum.includes(value)) {
       throw new DocuDBError(
-        validators.message || `The value must be one of: ${validators.enum.join(', ')}`,
+        validators.message ?? `The value must be one of: ${validators.enum.join(', ')}`,
         MCO_ERROR.SCHEMA.INVALID_ENUM,
         { field, value, allowedValues: validators.enum }
       )
@@ -276,7 +276,7 @@ class Schema implements SchemaInterface {
       // If result is false, validation failed
       if (result === false) {
         throw new DocuDBError(
-          validators.message || 'Failed custom validation',
+          validators.message ?? 'Failed custom validation',
           MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
           { field, value }
         )

@@ -169,7 +169,7 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
           const current = await counters.findById(counter._id)
           if (current != null) {
             return await counters.updateById(counter._id, {
-              $set: { value: current.value + 1 }
+              $set: { value: current.value as number + 1 }
             })
           } else {
             throw new DocuDBError('Counter not found', MCO_ERROR.DOCUMENT.NOT_FOUND)
@@ -227,7 +227,7 @@ describe('DocuDB - Concurrency and Data Integrity', () => {
               return await products.updateById(product._id, {
                 $set: {
                   stock: currentProduct.stock - 10,
-                  reserved: currentProduct.reserved + 10
+                  reserved: currentProduct.reserved as number + 10
                 }
               })
             } else {

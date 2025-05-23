@@ -135,7 +135,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if the document matches the criteria
    * @private
    */
-  _evaluateCriteria (doc: Document, criteria: QueryCriteria) {
+  _evaluateCriteria (doc: Document, criteria: QueryCriteria): boolean {
     // If criteria is null or undefined, always matches
     if (criteria == null) return true
 
@@ -200,7 +200,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if the operator condition is met
    * @private
    */
-  _evaluateOperator (operator: string, docValue: any, criteriaValue: any) {
+  _evaluateOperator (operator: string, docValue: any, criteriaValue: any): boolean {
     switch (operator) {
       case '$eq':
         return this._equals(docValue, criteriaValue)
@@ -237,10 +237,10 @@ class Query implements QueryInterface {
         }
         return true
       case '$exists':
-        return criteriaValue ? docValue !== undefined : docValue === undefined
+        return criteriaValue !== undefined ? docValue !== undefined : docValue === undefined
       case '$regex': {
         if (typeof docValue !== 'string') return false
-        const flags = criteriaValue.$options || ''
+        const flags = criteriaValue.$options ?? ''
         const pattern =
           criteriaValue instanceof RegExp
             ? criteriaValue
@@ -302,8 +302,8 @@ class Query implements QueryInterface {
    * @returns {*} - Found value or undefined
    * @private
    */
-  _getNestedValue (obj: Document, path: string) {
-    if (!obj || !path) return undefined
+  _getNestedValue (obj: Document, path: string): Document | undefined {
+    if (obj === undefined || path === undefined) return undefined
 
     const parts = path.split('.')
     let current = obj
@@ -322,7 +322,7 @@ class Query implements QueryInterface {
    * @returns {Array} - Sorted results
    * @private
    */
-  _applySorting (results: Document[]) {
+  _applySorting (results: Document[]): Document[] {
     if (this.sortOptions == null) return results
 
     return [...results].sort((a, b) => {
@@ -345,12 +345,12 @@ class Query implements QueryInterface {
    * @returns {Array} - Results with projection applied
    * @private
    */
-  _applyProjection (results: Document[]) {
+  _applyProjection (results: Document[]): Document[] {
     return results.map(doc => {
       const projected: Document = {}
 
       for (const [field, include] of Object.entries(this.selectFields as Record<string, 1 | -1>)) {
-        if (include) {
+        if (!Number.isNaN(include)) {
           const value = this._getNestedValue(doc, field)
           if (value !== undefined) {
             // Handle nested fields
@@ -359,7 +359,7 @@ class Query implements QueryInterface {
 
             for (let i = 0; i < parts.length - 1; i++) {
               const part = parts[i]
-              if (!current[part]) current[part] = {}
+              if (current[part] === undefined) current[part] = {}
               current = current[part]
             }
 

@@ -47,5 +47,15 @@
     "mocha": "^11.3.0",
     "ts-standard": "^12.0.2",
     "typescript": "^5.8.3"
+  },
+  "eslintConfig": {
+    "extends": "./node_modules/ts-standard/eslintrc.json",
+    "parserOptions": {
+      "project": "./tsconfig.json"
+    },
+    "ignorePatterns": ["dist/**/*"],
+    "rules": {
+      "no-unused-expressions": "off"
+    }
   }
 }

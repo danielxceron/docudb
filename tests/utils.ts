@@ -6,15 +6,15 @@ import { fileURLToPath } from 'node:url'
 const _filename = fileURLToPath(import.meta.url)
 export const _dirname = path.join(path.dirname(_filename), '../../')
 
-export const getTestDataDir = (testName: string = '') => {
+export const getTestDataDir = (testName: string = ''): string => {
   const testDataDir = path.join(_dirname, 'data', testName)
   return testDataDir
 }
 
-export const cleanTestDataDir = async (testName: string = '') => {
+export const cleanTestDataDir = async (testName: string = ''): Promise<string> => {
   const testDataDir = getTestDataDir(testName)
   const exists = await fsPromises.stat(testDataDir).catch(() => false)
-  if (exists) {
+  if (exists !== false) {
     await fsPromises.rm(testDataDir, { recursive: true })
   }
 
@@ -22,7 +22,7 @@ export const cleanTestDataDir = async (testName: string = '') => {
 }
 
 // clean test data dir sync
-export const cleanTestDataDirSync = (testName: string = '') => {
+export const cleanTestDataDirSync = (testName: string = ''): string => {
   const testDataDir = getTestDataDir(testName)
   if (fs.existsSync(testDataDir)) {
     fs.rmSync(testDataDir, { recursive: true })
