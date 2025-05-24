@@ -355,17 +355,18 @@ export class Collection {
    */
   async insertOne (doc: Document): Promise<DocumentWithId> {
     try {
-      if (typeof doc !== 'object') {
-        throw new DocuDBError(
-          'Document must be an object',
-          MCO_ERROR.DOCUMENT.INVALID_DOCUMENT
-        )
-      }
-
       // Validate schema if exists
       let validatedDoc = doc
       if (this.schema != null) {
         validatedDoc = this.schema.validate(doc)
+      } else {
+        // If no schema, just check if it's an object
+        if (typeof doc !== 'object') {
+          throw new DocuDBError(
+            'Document must be an object',
+            MCO_ERROR.DOCUMENT.INVALID_DOCUMENT
+          )
+        }
       }
 
       // Generate ID if it doesn't exist
@@ -392,8 +393,16 @@ export class Collection {
         }
       }
 
-      // Save document
       const docId = validatedDoc._id
+
+      // Update indices
+      await this.indexManager.updateIndex(
+        this.name,
+        docId,
+        validatedDoc as DocumentWithId
+      )
+
+      // Save document
       const chunkPaths = await this.storage.saveData(
         path.join(this.name, docId),
         validatedDoc
@@ -416,13 +425,6 @@ export class Collection {
       this.metadata.documentOrder.push(docId)
 
       await this._saveMetadata()
-
-      // Update indices
-      await this.indexManager.updateIndex(
-        this.name,
-        docId,
-        validatedDoc as DocumentWithId
-      )
 
       return validatedDoc as DocumentWithId
     } catch (error: any) {
