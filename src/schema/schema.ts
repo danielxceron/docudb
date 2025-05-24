@@ -9,7 +9,7 @@ import {
   SchemaOptions,
   ValidationRules,
   Schema as SchemaInterface,
-  Document
+  DocumentStructure
 } from '../types/index.js'
 
 class Schema implements SchemaInterface {
@@ -41,7 +41,7 @@ class Schema implements SchemaInterface {
    * @returns Validated and normalized document
    * @throws {DocuDBError} - If the document does not comply with the schema
    */
-  validate (document: Document): Document {
+  validate (document: DocumentStructure): DocumentStructure {
     if (typeof document !== 'object') {
       throw new DocuDBError(
         'The document must be an object',
@@ -49,7 +49,7 @@ class Schema implements SchemaInterface {
       )
     }
 
-    const validatedDoc: Document = {}
+    const validatedDoc: DocumentStructure = {}
 
     // Validate each field according to the schema definition
     for (const [field, fieldDef] of Object.entries(this.definition)) {
@@ -184,11 +184,11 @@ class Schema implements SchemaInterface {
    * @param {*} value - Value to validate
    * @param {Function|Array|Object} validators - Validators to execute
    * @param {string} field - Field name being validated
-   * @param {Document} document - The complete document being validated
+   * @param {DocumentStructure} document - The complete document being validated
    * @returns {void} - Throws an error if validation fails
    * @private
    */
-  private _runValidators (value: any, validators: ValidationRules, field: string, document?: Document): void {
+  private _runValidators (value: any, validators: ValidationRules, field: string, document?: DocumentStructure): void {
     // Validate min/max for numbers
     if (typeof value === 'number') {
       if ((validators.min !== undefined) && value < validators.min) {

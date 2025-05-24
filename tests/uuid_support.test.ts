@@ -2,7 +2,7 @@ import { Database, Schema } from '../index.js'
 import { expect } from 'chai'
 import { isValidUUID } from '../src/utils/uuidUtils.js'
 
-import { Document } from '../src/types/index.js'
+import { DocumentStructure } from '../src/types/index.js'
 
 import { cleanTestDataDir } from './utils.js'
 
@@ -107,7 +107,7 @@ describe('DocuDB - UUID Support and Custom Default Functions', () => {
         code: {
           type: 'string',
           // Custom function that generates a code based on the document
-          default: (doc: Document) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}`
+          default: (doc: DocumentStructure) => `PROD-${doc.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000)}`
         }
       })
 

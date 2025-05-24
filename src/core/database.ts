@@ -20,10 +20,10 @@ import {
   StorageOptions,
   CollectionOptions,
   CollectionMetadata,
-  Document,
+  DocumentStructure,
   UpdateOperations,
   DocumentLocks,
-  DocumentWithId,
+  Document,
   Schema,
   IndexOptions,
   Index,
@@ -278,7 +278,7 @@ export class Collection {
   indexManager: IndexManager
   options: CollectionOptions
   schema: Schema | null
-  documents: Record<string, Document>
+  documents: Record<string, DocumentStructure>
   metadataPath: string
   metadata: CollectionMetadata
   /**
@@ -351,10 +351,10 @@ export class Collection {
 
   /**
    * Inserts a document into the collection
-   * @param {Document} doc - Document to insert
-   * @returns {Promise<DocumentWithId>} - Inserted document with ID
+   * @param {DocumentStructure} doc - Document to insert
+   * @returns {Promise<Document>} - Inserted document with ID
    */
-  async insertOne (doc: Document): Promise<DocumentWithId> {
+  async insertOne (doc: DocumentStructure): Promise<Document> {
     try {
       // Validate schema if exists
       let validatedDoc = doc
@@ -400,7 +400,7 @@ export class Collection {
       await this.indexManager.updateIndex(
         this.name,
         docId,
-        validatedDoc as DocumentWithId
+        validatedDoc as Document
       )
 
       // Save document
@@ -427,7 +427,7 @@ export class Collection {
 
       await this._saveMetadata()
 
-      return validatedDoc as DocumentWithId
+      return validatedDoc as Document
     } catch (error: any) {
       throw new DocuDBError(
         `Error inserting document: ${(error as Error).message}`,
@@ -442,7 +442,7 @@ export class Collection {
    * @param {Object[]} docs - Documents to insert
    * @returns {Promise<Object[]>} - Inserted documents with IDs
    */
-  async insertMany (docs: Document[]): Promise<DocumentWithId[]> {
+  async insertMany (docs: DocumentStructure[]): Promise<Document[]> {
     try {
       if (!Array.isArray(docs)) {
         throw new DocuDBError(
@@ -473,7 +473,7 @@ export class Collection {
    * @param {string} id - Document ID
    * @returns {Promise<Object|null>} - Found document or null
    */
-  async findById (id: string): Promise<DocumentWithId | null> {
+  async findById (id: string): Promise<Document | null> {
     try {
       // Check if we have a schema with custom ID validation
       let skipDefaultIdValidation = false
@@ -551,9 +551,9 @@ export class Collection {
   /**
    * Finds documents matching criteria
    * @param {QueryCriteria} criteria - Search criteria
-   * @returns {Promise<Document[]>} - Found documents
+   * @returns {Promise<DocumentStructure[]>} - Found documents
    */
-  async find (criteria: QueryCriteria = {}): Promise<DocumentWithId[]> {
+  async find (criteria: QueryCriteria = {}): Promise<Document[]> {
     try {
       const query = criteria instanceof Query ? criteria : new Query(criteria)
       // Try to use indices to optimize search
@@ -580,7 +580,7 @@ export class Collection {
    * @param {QueryCriteria} criteria - Search criteria
    * @returns {Promise<Object|null>} - Found document or null
    */
-  async findOne (criteria: QueryCriteria = {}): Promise<DocumentWithId | null> {
+  async findOne (criteria: QueryCriteria = {}): Promise<Document | null> {
     try {
       const results = await this.find(criteria)
       return results.length > 0 ? results[0] : null
@@ -597,12 +597,12 @@ export class Collection {
    * Updates a document by its ID
    * @param {string} id - Document ID
    * @param {Object} update - Changes to apply
-   * @returns {Promise<DocumentWithId|null>} - Updated document or null
+   * @returns {Promise<Document|null>} - Updated document or null
    */
   async updateById (
     id: string,
     update: UpdateOperations
-  ): Promise<DocumentWithId | null> {
+  ): Promise<Document | null> {
     try {
       // Check if we have a schema with custom ID validation
       let skipDefaultIdValidation = false
@@ -1049,7 +1049,7 @@ export class Collection {
    * @param {number} position - Index of the document in the collection
    * @returns {Promise<Object|null>} - Document at the specified index or null if not found
    */
-  async findByPosition (position: number): Promise<DocumentWithId | null> {
+  async findByPosition (position: number): Promise<Document | null> {
     try {
       if (typeof position !== 'number' || position < 0) {
         throw new DocuDBError(
@@ -1236,7 +1236,7 @@ export class Collection {
    * @returns {Object} - Updated document
    * @private
    */
-  private _applyUpdate (doc: DocumentWithId, update: UpdateOperations): DocumentWithId {
+  private _applyUpdate (doc: Document, update: UpdateOperations): Document {
     const result = deepCopy(doc)
 
     if (update.$set == null && update.$unset == null && update.$inc == null) {
@@ -1347,23 +1347,23 @@ export class Collection {
 
   /**
    * Loads all documents in the collection
-   * @returns {Promise<DocumentWithId[]>} - All documents
+   * @returns {Promise<Document[]>} - All documents
    * @private
    */
-  private async _loadAllDocuments (): Promise<DocumentWithId[]> {
+  private async _loadAllDocuments (): Promise<Document[]> {
     try {
       const collectionDir = path.join(this.storage.dataDir, this.name)
       const items = await promisify(fs.readdir)(collectionDir, {
         withFileTypes: true
       })
-      const docs: DocumentWithId[] = []
-      const documentMap: Record<string, DocumentWithId> = {}
+      const docs: Document[] = []
+      const documentMap: Record<string, Document> = {}
 
       // First load all documents into a map
       for (const item of items) {
         if (item.isDirectory() && !item.name.startsWith('_')) {
           const docId = item.name
-          const doc: DocumentWithId | null = await this.findById(docId)
+          const doc: Document | null = await this.findById(docId)
           if (doc != null) {
             documentMap[docId] = doc
           }
@@ -1404,10 +1404,10 @@ export class Collection {
   /**
    * Attempts to optimize a query using indexes
    * @param {Query} query - Query to optimize
-   * @returns {Promise<DocumentWithId[]|null>} - Results or null if the optimization failed
+   * @returns {Promise<Document[]|null>} - Results or null if the optimization failed
    * @private
    */
-  private async _findWithOptimization (query: Query): Promise<DocumentWithId[] | null> {
+  private async _findWithOptimization (query: Query): Promise<Document[] | null> {
     for (const field in query.criteria) {
       if (this.indexManager.hasIndex(this.name, field)) {
         const value = (query.criteria as QueryFieldName)[field]

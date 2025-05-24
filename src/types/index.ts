@@ -168,7 +168,7 @@ export interface IndexDefinition {
 /**
  * Base document structure
  */
-export interface Document {
+export interface DocumentStructure {
   /** Document unique identifier */
   _id?: string
   [key: string]: any
@@ -177,7 +177,7 @@ export interface Document {
 /**
  * Document with guaranteed ID field
  */
-export interface DocumentWithId extends Document {
+export interface Document extends DocumentStructure {
   _id: string
 }
 
@@ -189,7 +189,7 @@ export type SchemaFieldType = 'string' | 'number' | 'boolean' | 'date' | 'object
 /**
  * Default value generator function
  */
-export type DefaultValueGenerator = (doc: Document, field: string) => unknown
+export type DefaultValueGenerator = (doc: DocumentStructure, field: string) => unknown
 
 /**
  * Schema field definition
@@ -227,7 +227,7 @@ export interface SchemaOptions {
 /**
  * Custom validation function type
  */
-export type CustomValidator = (value: any, doc?: Document) => boolean | string | Promise<boolean | string>
+export type CustomValidator = (value: any, doc?: DocumentStructure) => boolean | string | Promise<boolean | string>
 
 /**
  * Validation rules for schema fields
@@ -462,7 +462,7 @@ export interface Schema {
   /** Schema options */
   options: SchemaOptions
   /** Validates a document against the schema */
-  validate: (document: Document) => Document
+  validate: (document: DocumentStructure) => DocumentStructure
 }
 
 /**

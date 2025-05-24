@@ -9,7 +9,7 @@ import { promisify } from 'node:util'
 import { fileExists } from '../utils/fileUtils.js'
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 
-import { IndexManagerOptions, IndexOptions, Metadata, DocumentWithId } from '../types/index.js'
+import { IndexManagerOptions, IndexOptions, Metadata, Document } from '../types/index.js'
 
 const readFilePromise = promisify(fs.readFile)
 const writeFilePromise = promisify(fs.writeFile)
@@ -164,7 +164,7 @@ class IndexManager {
    * @param {Object} doc - Document to index
    * @returns {Promise<void>}
    */
-  async updateIndex (collectionName: string, docId: string, doc: DocumentWithId): Promise<void> {
+  async updateIndex (collectionName: string, docId: string, doc: Document): Promise<void> {
     try {
       for (const indexKey in this.indices) {
         if (indexKey.startsWith(`${collectionName}:`)) {

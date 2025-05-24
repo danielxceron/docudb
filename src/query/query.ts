@@ -8,9 +8,9 @@ import {
   QueryCriteria,
   SortOptions,
   SelectFields,
-  Document,
+  DocumentStructure,
   Query as QueryInterface,
-  DocumentWithId
+  Document
 } from '../types/index.js'
 
 class Query implements QueryInterface {
@@ -42,7 +42,7 @@ class Query implements QueryInterface {
    * @param doc - Document to evaluate
    * @returns true if the document matches the criteria
    */
-  matches (doc: Document): boolean {
+  matches (doc: DocumentStructure): boolean {
     return this._evaluateCriteria(doc, this.criteria)
   }
 
@@ -97,7 +97,7 @@ class Query implements QueryInterface {
    * @param documents - Documents to filter
    * @returns Documents that match the criteria
    */
-  execute (documents: Document[]): DocumentWithId[] {
+  execute (documents: DocumentStructure[]): Document[] {
     // Filter documents according to criteria
     let results = []
 
@@ -125,7 +125,7 @@ class Query implements QueryInterface {
       results = this._applyProjection(results)
     }
 
-    return results as DocumentWithId[]
+    return results as Document[]
   }
 
   /**
@@ -135,7 +135,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if the document matches the criteria
    * @private
    */
-  private _evaluateCriteria (doc: Document, criteria: any = {}): boolean {
+  private _evaluateCriteria (doc: DocumentStructure, criteria: any = {}): boolean {
     // If criteria is null or undefined, always matches
     if (criteria == null) return true
 
@@ -302,7 +302,7 @@ class Query implements QueryInterface {
    * @returns {*} - Found value or undefined
    * @private
    */
-  private _getNestedValue (obj: Document, path: string): Document | undefined {
+  private _getNestedValue (obj: DocumentStructure, path: string): DocumentStructure | undefined {
     if (obj === undefined || path === undefined) return undefined
 
     const parts = path.split('.')
@@ -322,7 +322,7 @@ class Query implements QueryInterface {
    * @returns {Array} - Sorted results
    * @private
    */
-  private _applySorting (results: Document[]): Document[] {
+  private _applySorting (results: DocumentStructure[]): DocumentStructure[] {
     if (this.sortOptions == null) return results
 
     return [...results].sort((a, b) => {
@@ -345,9 +345,9 @@ class Query implements QueryInterface {
    * @returns {Array} - Results with projection applied
    * @private
    */
-  private _applyProjection (results: Document[]): Document[] {
+  private _applyProjection (results: DocumentStructure[]): DocumentStructure[] {
     return results.map(doc => {
-      const projected: Document = {}
+      const projected: DocumentStructure = {}
 
       for (const [field, include] of Object.entries(this.selectFields as Record<string, 1 | -1>)) {
         if (!Number.isNaN(include)) {

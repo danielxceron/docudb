@@ -17,7 +17,7 @@ import {
   StorageOptions,
   CollectionOptions,
   CollectionMetadata,
-  Document,
+  DocumentStructure,
   IndexDefinition,
 
   // Schema interfaces
@@ -61,7 +61,7 @@ export {
   StorageOptions,
   CollectionOptions,
   CollectionMetadata,
-  Document,
+  DocumentStructure as Document,
   IndexDefinition,
   SchemaDefinition,
   SchemaOptions,

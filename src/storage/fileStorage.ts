@@ -10,7 +10,7 @@ import { promisify } from 'node:util'
 import gzip from '../compression/gzip.js'
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 import { fileExists } from '../utils/fileUtils.js'
-import { DocumentWithId, StorageOptions } from '../types/index.js'
+import { Document, StorageOptions } from '../types/index.js'
 
 // Convert callback functions to promises
 const readFilePromise = promisify(fs.readFile)
@@ -114,9 +114,9 @@ class FileStorage {
   /**
    * Reads data from a set of chunks
    * @param {string[]} chunkPaths - Paths of chunks to read
-   * @returns {Promise<DocumentWithId>} - Combined data
+   * @returns {Promise<Document>} - Combined data
    */
-  async readData (chunkPaths: string[]): Promise<DocumentWithId> {
+  async readData (chunkPaths: string[]): Promise<Document> {
     try {
       let combinedData = ''
 
