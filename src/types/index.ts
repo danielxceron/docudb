@@ -91,18 +91,16 @@ export interface DocumentLocks {
  * Index structure
  */
 export interface Index extends IndexMetadataProperties {
-  /** Index name */
-  name: string
-  /** Whether the index is compound */
-  isCompound: boolean
-  /** Whether the index enforces uniqueness */
+  isCompound?: boolean
   unique: boolean
-  /** Whether the index is sparse */
   sparse: boolean
-  /** Entries for the index */
-  entries: Record<string, string[]>
-  /** Metadata for the index */
-  metadata: Record<string, any>
+  entries?: Record<string, string[]>
+  metadata?: {
+    created: Date
+    updated: Date
+    name: string
+    [key: string]: any
+  }
 }
 
 /**
@@ -256,20 +254,8 @@ export interface ValidationRules {
 /**
  * Query criteria for filtering documents
 */
-
-export type QueryCriteria = QueryFieldName | QueryOperators
-export interface QueryFieldName {
-  /** Field name */
-  [key: string]: QueryOperators | string | number | boolean
-}
-export interface QueryOperators {
+export interface QueryLogicalOperators {
   /** Logical operators */
-
-  /** All operator
- * @description Matches documents where the value of the field is an array and contains all the specified values
- * @example { tags: { $all: ['tag1', 'tag2'] } }
- */
-  $all?: QueryCriteria[]
 
   /** Or operator
    * @description Logical OR operator
@@ -289,63 +275,60 @@ export interface QueryOperators {
    * @example { $not: { name: { $eq: 'John' } } }
    */
   $not?: QueryCriteria
-
-  /** Array of values */
-
-  /** In operator
-   * @description Matches any of the values in the array
-   * @example { $in: ['John', 'Jane'] }
-   */
-  $in?: any[]
-
-  /** Not in operator
-   * @description Matches none of the values in the array
-   * @example { $nin: ['John', 'Jane'] }
-   */
-  $nin?: any[]
-
-  /** Comparison operators */
-
+}
+export interface QuerySpecificOperators {
   /** Equal operator (=)
    * @description Matches documents where the value of the field is equal to the specified value
    * @example
    * { name: { $eq: 'John' }, age: { $eq: 30 } }
    */
-  $eq?: any
+  $eq?: Date | number | string | boolean | null | undefined
 
   /** Not equal operator (!=)
    * @description Matches documents where the value of the field is not equal to the specified value
    * @example { $ne: 'John' }
    */
-  $ne?: any
+  $ne?: Date | number | string | boolean | null | undefined
 
   /** Greater than operator (>)
    * @description Matches documents where the value of the field is greater than the specified value
    * Similar to the greater than operator in SQL
    * @example { age: { $gt: 30 } }
    */
-  $gt?: any
+  $gt?: Date | number
 
   /** Greater than or equal operator (>=)
    * @description Matches documents where the value of the field is greater than or equal to the specified value
    * Similar to the greater than or equal operator in SQL
    * @example { age: { $gte: 30 } }
    */
-  $gte?: any
+  $gte?: Date | number
 
   /** Less than operator (<)
    * @description Matches documents where the value of the field is less than the specified value
    * Similar to the less than operator in SQL
    * @example { age: { $lt: 30 } }
    */
-  $lt?: any
+  $lt?: Date | number
 
   /** Less than or equal operator (<=)
    * @description Matches documents where the value of the field is less than or equal to the specified value
    * Similar to the less than or equal operator in SQL
    * @example { age: { $lte: 30 } }
    */
-  $lte?: any
+  $lte?: Date | number
+
+  /** In operator
+   * @description Matches any of the values in the array
+   * @example { $in: ['John', 'Jane'] }
+   */
+  $in?: Array<Date | number | string | boolean | null | undefined>
+
+  /** Not in operator
+   * @description Matches none of the values in the array
+   * @example { $nin: ['John', 'Jane'] }
+   */
+  $nin?: Array<Date | number | string | boolean | null | undefined>
 
   /** Existence operator
    * @description Matches documents where the specified field exists
@@ -364,7 +347,18 @@ export interface QueryOperators {
    * @example { tags: { $size: 2 } }
    */
   $size?: number
+
+  /** All operator
+   * @description Coincide con documentos donde el valor del campo es una matriz y contiene todos los valores especificados
+   * @example { tags: { $all: ['tag1', 'tag2'] } }
+   */
+  $all?: Array<Date | number | string | boolean | null | undefined>
 }
+export interface QueryFieldName {
+  [key: string]: QuerySpecificOperators | string | number | boolean
+}
+
+export type QueryCriteria = QueryLogicalOperators | QueryFieldName
 
 /**
  * Sort direction

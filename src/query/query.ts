@@ -135,7 +135,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if the document matches the criteria
    * @private
    */
-  _evaluateCriteria (doc: Document, criteria: QueryCriteria = {}): boolean {
+  private _evaluateCriteria (doc: Document, criteria: any = {}): boolean {
     // If criteria is null or undefined, always matches
     if (criteria == null) return true
 
@@ -164,7 +164,7 @@ class Query implements QueryInterface {
             }
             break
           case '$not':
-            if (this._evaluateCriteria(doc, criteria[key] as QueryCriteria)) {
+            if (this._evaluateCriteria(doc, criteria[key])) {
               return false
             }
             break
@@ -178,8 +178,8 @@ class Query implements QueryInterface {
         // If criteria is an object, it may contain operators
         if (criteria[key as keyof QueryCriteria] !== null && typeof criteria[key as keyof QueryCriteria] === 'object') {
           // Check each operator in criteria
-          for (const op in criteria[key as keyof QueryCriteria]) {
-            if (!this._evaluateOperator(op, value, criteria[key as keyof QueryCriteria][op])) {
+          for (const op in criteria[key]) {
+            if (!this._evaluateOperator(op, value, criteria[key][op])) {
               return false
             }
           }
@@ -200,7 +200,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if the operator condition is met
    * @private
    */
-  _evaluateOperator (operator: string, docValue: any, criteriaValue: any): boolean {
+  private _evaluateOperator (operator: string, docValue: any, criteriaValue: any): boolean {
     switch (operator) {
       case '$eq':
         return this._equals(docValue, criteriaValue)
@@ -267,7 +267,7 @@ class Query implements QueryInterface {
    * @returns {boolean} - true if values are equal
    * @private
    */
-  _equals (a: any, b: any): boolean {
+  private _equals (a: any, b: any): boolean {
     if (a === b) return true
 
     // Date comparison
@@ -302,7 +302,7 @@ class Query implements QueryInterface {
    * @returns {*} - Found value or undefined
    * @private
    */
-  _getNestedValue (obj: Document, path: string): Document | undefined {
+  private _getNestedValue (obj: Document, path: string): Document | undefined {
     if (obj === undefined || path === undefined) return undefined
 
     const parts = path.split('.')
@@ -322,7 +322,7 @@ class Query implements QueryInterface {
    * @returns {Array} - Sorted results
    * @private
    */
-  _applySorting (results: Document[]): Document[] {
+  private _applySorting (results: Document[]): Document[] {
     if (this.sortOptions == null) return results
 
     return [...results].sort((a, b) => {
@@ -345,7 +345,7 @@ class Query implements QueryInterface {
    * @returns {Array} - Results with projection applied
    * @private
    */
-  _applyProjection (results: Document[]): Document[] {
+  private _applyProjection (results: Document[]): Document[] {
     return results.map(doc => {
       const projected: Document = {}
 

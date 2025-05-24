@@ -63,7 +63,7 @@ class FileStorage {
    * @returns {string[]} - Array of chunks
    * @private
    */
-  _splitIntoChunks (data: string): string[] {
+  private _splitIntoChunks (data: string): string[] {
     const chunks = []
     let offset = 0
 
@@ -188,7 +188,7 @@ class FileStorage {
    * @returns {string} - Chunk path
    * @private
    */
-  _getChunkPath (collectionName: string, chunkIndex: number): string {
+  private _getChunkPath (collectionName: string, chunkIndex: number): string {
     return path.join(
       this.dataDir,
       collectionName,

@@ -154,7 +154,7 @@ class Schema implements SchemaInterface {
    * @returns {boolean} - Indicates if the value is of the expected type
    * @private
    */
-  _validateType (value: any, type: string | Function): boolean {
+  private _validateType (value: any, type: string | Function): boolean {
     if (typeof type === 'function') {
       return value instanceof type
     }
@@ -188,7 +188,7 @@ class Schema implements SchemaInterface {
    * @returns {void} - Throws an error if validation fails
    * @private
    */
-  _runValidators (value: any, validators: ValidationRules, field: string, document?: Document): void {
+  private _runValidators (value: any, validators: ValidationRules, field: string, document?: Document): void {
     // Validate min/max for numbers
     if (typeof value === 'number') {
       if ((validators.min !== undefined) && value < validators.min) {

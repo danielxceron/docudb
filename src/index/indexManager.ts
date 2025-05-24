@@ -15,8 +15,27 @@ const readFilePromise = promisify(fs.readFile)
 const writeFilePromise = promisify(fs.writeFile)
 const mkdirPromise = promisify(fs.mkdir)
 
+interface Index {
+  field: string | string[]
+  isCompound: boolean
+  unique: boolean
+  sparse: boolean
+  entries: {
+    [key: string]: string[]
+  }
+  metadata: {
+    created: Date
+    updated: Date
+    name: string
+    [key: string]: any
+  }
+}
+interface Indices {
+  [key: string]: Index
+}
+
 class IndexManager {
-  indices: Record<string, any>
+  indices: Indices
   dataDir: string
   /**
    * @param {Object} options - Configuration options
@@ -155,7 +174,7 @@ class IndexManager {
           // Get field value from document
           let value
 
-          if (index.isCompound === true) {
+          if (index.isCompound) {
             // For compound indices, create a composite key
             const values = []
             for (const f of field) {
@@ -164,7 +183,7 @@ class IndexManager {
             value = values.join('|')
           } else {
             // For simple indices
-            value = this._getNestedValue(doc, field)
+            value = this._getNestedValue(doc, field as string)
           }
 
           // If value is undefined and index is sparse, skip
@@ -173,12 +192,10 @@ class IndexManager {
           }
 
           // Check uniqueness if needed
-          if (index.unique === true && value !== undefined) {
+          if (index.unique && value !== undefined) {
             const existingId = this._findDocIdByValue(index, value)
             if (existingId !== null && existingId !== docId) {
-              throw new Error(
-                `Unique Index Violation: Duplicate value for ${index.isCompound ? 'compound index' : field}`
-              )
+              throw new Error(`Unique Index Violation: Duplicate value for ${index.isCompound ? 'compound index' : String(field)}`)
             }
           }
 
@@ -275,7 +292,7 @@ class IndexManager {
     }
 
     const valueKey = this._getValueKey(value)
-    return index.entries[valueKey] ?? []
+    return (index as Index).entries[valueKey] ?? []
   }
 
   /**
@@ -295,7 +312,7 @@ class IndexManager {
    * @returns {string} - Directory path
    * @private
    */
-  _getIndexDir (collectionName: string): string {
+  private _getIndexDir (collectionName: string): string {
     return path.join(this.dataDir, collectionName, '_indices')
   }
 
@@ -306,7 +323,7 @@ class IndexManager {
    * @returns {string} - File path
    * @private
    */
-  _getIndexPath (collectionName: string, field: string): string {
+  private _getIndexPath (collectionName: string, field: string): string {
     return path.join(this._getIndexDir(collectionName), `${field}.idx`)
   }
 
@@ -316,7 +333,7 @@ class IndexManager {
    * @returns {Promise<void>}
    * @private
    */
-  async _loadIndices (collectionName: string): Promise<void> {
+  private async _loadIndices (collectionName: string): Promise<void> {
     try {
       const indexDir = this._getIndexDir(collectionName)
       const exists = await fileExists(indexDir)
@@ -350,7 +367,7 @@ class IndexManager {
    * @returns {Promise<void>}
    * @private
    */
-  async _saveIndex (collectionName: string, field: string): Promise<void> {
+  private async _saveIndex (collectionName: string, field: string): Promise<void> {
     try {
       const indexKey = `${collectionName}:${field}`
       const index = this.indices[indexKey]
@@ -414,7 +431,7 @@ class IndexManager {
    * @returns {Promise<void>}
    * @private
    */
-  async _saveAllIndices (collectionName: string): Promise<void> {
+  private async _saveAllIndices (collectionName: string): Promise<void> {
     try {
       for (const indexKey in this.indices) {
         if (indexKey.startsWith(`${collectionName}:`)) {
@@ -437,7 +454,7 @@ class IndexManager {
    * @returns {boolean} - true if any entry was removed
    * @private
    */
-  _removeDocFromIndex (index: IndexOptions, docId: string): boolean {
+  private _removeDocFromIndex (index: IndexOptions, docId: string): boolean {
     let updated = false
 
     for (const valueKey in index.entries) {
@@ -468,7 +485,7 @@ class IndexManager {
    * @returns {string|null} - Document ID or null if not found
    * @private
    */
-  _findDocIdByValue (index: any, value: any): string | null {
+  private _findDocIdByValue (index: any, value: any): string | null {
     const valueKey = this._getValueKey(value)
     const docIds = index.entries[valueKey]
 
@@ -481,7 +498,7 @@ class IndexManager {
    * @returns {string} - Key for the index
    * @private
    */
-  _getValueKey (value: any): string {
+  private _getValueKey (value: any): string {
     if (value === null) return 'null'
     if (value === undefined) return 'undefined'
 
@@ -493,7 +510,7 @@ class IndexManager {
       return `obj:${JSON.stringify(value)}`
     }
 
-    return `${typeof value}:${value}`
+    return `${typeof value}:${String(value)}`
   }
 
   /**
@@ -503,7 +520,7 @@ class IndexManager {
    * @returns {*} - Found value or undefined
    * @private
    */
-  _getNestedValue (obj: any, path: string): any {
+  private _getNestedValue (obj: any, path: string): any {
     if (obj === undefined || path === undefined) return undefined
 
     const parts = path.split('.')
