@@ -53,14 +53,14 @@ class Database {
   /** Index manager instance */
   public indexManager: IndexManager
   /** Database Initialized */
-  public initialized: boolean
+  private _initialized: boolean
 
   /**
    * Creates a new database instance
    * @param options - Configuration options
    */
   constructor (options: DatabaseOptions = {}) {
-    this.initialized = false
+    this._initialized = false
     this.name = options.name ?? 'docudb'
     this.collections = {}
     // ID generation options
@@ -113,7 +113,7 @@ class Database {
 
       // Load existing collections metadata
       await this._loadCollections()
-      this.initialized = true
+      this._initialized = true
     } catch (error: any) {
       throw new DocuDBError(
         `Error initializing database: ${(error as Error).message}`,
@@ -133,7 +133,7 @@ class Database {
     collectionName: string,
     options: CollectionOptions = { idType: this.idType }
   ): Collection {
-    if (!this.initialized) {
+    if (!this._initialized) {
       throw new DocuDBError(
         'Database not initialized',
         MCO_ERROR.DATABASE.NOT_INITIALIZED
@@ -173,7 +173,7 @@ class Database {
    */
   public async dropCollection (collectionName: string): Promise<boolean> {
     try {
-      if (!this.initialized) {
+      if (!this._initialized) {
         throw new DocuDBError(
           'Database not initialized',
           MCO_ERROR.DATABASE.NOT_INITIALIZED
@@ -219,7 +219,7 @@ class Database {
    */
   public async listCollections (): Promise<string[]> {
     try {
-      if (!this.initialized) {
+      if (!this._initialized) {
         throw new DocuDBError(
           'Database not initialized',
           MCO_ERROR.DATABASE.NOT_INITIALIZED
