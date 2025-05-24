@@ -960,10 +960,10 @@ export class Collection {
           const field = key.split(':')[1]
           const index = this.indexManager.indices[key]
           indices.push({
+            ...index,
             field,
             unique: index.unique ?? false,
-            sparse: index.sparse ?? false,
-            ...index.metadata
+            sparse: index.sparse ?? false
           })
         }
       }

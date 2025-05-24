@@ -9,30 +9,11 @@ import { promisify } from 'node:util'
 import { fileExists } from '../utils/fileUtils.js'
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 
-import { IndexManagerOptions, IndexOptions, Metadata, Document } from '../types/index.js'
+import { IndexManagerOptions, IndexOptions, Metadata, Document, Indices, Index } from '../types/index.js'
 
 const readFilePromise = promisify(fs.readFile)
 const writeFilePromise = promisify(fs.writeFile)
 const mkdirPromise = promisify(fs.mkdir)
-
-interface Index {
-  field: string | string[]
-  isCompound: boolean
-  unique: boolean
-  sparse: boolean
-  entries: {
-    [key: string]: string[]
-  }
-  metadata: {
-    created: Date
-    updated: Date
-    name: string
-    [key: string]: any
-  }
-}
-interface Indices {
-  [key: string]: Index
-}
 
 class IndexManager {
   indices: Indices
@@ -174,7 +155,7 @@ class IndexManager {
           // Get field value from document
           let value
 
-          if (index.isCompound) {
+          if (index.isCompound === true) {
             // For compound indices, create a composite key
             const values = []
             for (const f of field) {
@@ -195,7 +176,7 @@ class IndexManager {
           if (index.unique && value !== undefined) {
             const existingId = this._findDocIdByValue(index, value)
             if (existingId !== null && existingId !== docId) {
-              throw new Error(`Unique Index Violation: Duplicate value for ${index.isCompound ? 'compound index' : String(field)}`)
+              throw new Error(`Unique Index Violation: Duplicate value for ${index.isCompound === true ? 'compound index' : String(field)}`)
             }
           }
 
@@ -205,10 +186,10 @@ class IndexManager {
           // Add new entry
           if (value !== undefined) {
             const valueKey = this._getValueKey(value)
-            if (index.entries[valueKey] === undefined) {
-              index.entries[valueKey] = []
+            if (index.entries?.[valueKey] === undefined) {
+              index.entries = { ...index.entries, [valueKey]: [] }
             }
-            index.entries[valueKey].push(docId)
+            index.entries?.[valueKey].push(docId)
           }
 
           // Update timestamp
@@ -292,7 +273,7 @@ class IndexManager {
     }
 
     const valueKey = this._getValueKey(value)
-    return (index as Index).entries[valueKey] ?? []
+    return (index as Index)?.entries?.[valueKey] ?? []
   }
 
   /**

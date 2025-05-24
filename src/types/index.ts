@@ -77,7 +77,7 @@ export interface IndexMetadataProperties {
   /** Field name */
   field?: IndexField
   /** Index options */
-  options?: IndexOptions
+  options?: IndexMetadata
 }
 
 /**
@@ -87,20 +87,23 @@ export interface DocumentLocks {
   [documentId: string]: boolean
 }
 
+export interface IndexMetadata {
+  created: Date
+  updated: Date
+  name: string
+  [key: string]: any
+}
+
 /**
  * Index structure
  */
 export interface Index extends IndexMetadataProperties {
+  field: IndexField
   isCompound?: boolean
   unique: boolean
   sparse: boolean
   entries?: Record<string, string[]>
-  metadata?: {
-    created: Date
-    updated: Date
-    name: string
-    [key: string]: any
-  }
+  metadata: IndexMetadata
 }
 
 /**
@@ -125,6 +128,10 @@ export interface IndexOptions {
   options?: IndexOptions
 }
 
+export interface Indices {
+  [key: string]: Index
+}
+
 /**
  * Collection options
  */
@@ -133,7 +140,9 @@ export interface CollectionOptions {
   idType?: IdType
   /** Schema for document validation */
   schema?: Schema
-  /** Indicates if timestamps should be added automatically */
+  /** Indicates if timestamps should be added automatically
+   * @default false
+  */
   timestamps?: boolean
 }
 
@@ -461,7 +470,10 @@ export interface Schema {
   definition: SchemaDefinition
   /** Schema options */
   options: SchemaOptions
-  /** Validates a document against the schema */
+  /** Validates a document against the schema
+   * @param document - Document to validate
+   * @returns Validated document
+  */
   validate: (document: DocumentStructure) => DocumentStructure
 }
 
