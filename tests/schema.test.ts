@@ -1,4 +1,4 @@
-import { Database, Schema, Query } from '../index.js'
+import { Database, Schema, Query, QueryCriteria } from '../index.js'
 import { expect } from 'chai'
 
 import { Collection } from '../src/core/database.js'
@@ -307,7 +307,7 @@ describe('DocuDB - Query Operations', () => {
         $and: [{ price: { $gt: 50 } }, { stock: { $gt: 0 } }]
       })
 
-      const results = await productos.find(query)
+      const results = await productos.find(query as QueryCriteria)
       expect(results).to.have.lengthOf(2)
       expect(results.map(p => p.name)).to.have.members(['Laptop', 'Monitor'])
     })
@@ -317,7 +317,7 @@ describe('DocuDB - Query Operations', () => {
         $or: [{ price: { $lt: 30 } }, { stock: { $eq: 0 } }]
       })
 
-      const results = await productos.find(query)
+      const results = await productos.find(query as QueryCriteria)
       expect(results).to.have.lengthOf(2)
       expect(results.map(p => p.name)).to.have.members(['Mouse', 'Tablet'])
     })
@@ -327,7 +327,7 @@ describe('DocuDB - Query Operations', () => {
         $not: { price: { $lt: 30 } }
       })
 
-      const results = await productos.find(query)
+      const results = await productos.find(query as QueryCriteria)
       expect(results).to.have.lengthOf(4)
       expect(results.map(p => p.name)).to.have.members(
         ['Laptop', 'Keyboard', 'Monitor', 'Tablet']
@@ -336,14 +336,14 @@ describe('DocuDB - Query Operations', () => {
 
     it('should handle sorting', async () => {
       const query = new Query({}).sort({ price: 1 })
-      const results = await productos.find(query)
+      const results = await productos.find(query as QueryCriteria)
       expect(results[0].name).to.equal('Mouse')
       expect(results[4].name).to.equal('Laptop')
     })
 
     it('should handle limit', async () => {
       const query = new Query({}).limit(2)
-      const results = await productos.find(query)
+      const results = await productos.find(query as QueryCriteria)
       expect(results).to.have.lengthOf(2)
     })
   })

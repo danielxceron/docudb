@@ -1,4 +1,4 @@
-import { Database, Schema, Query } from '../index.js'
+import { Database, Schema, Query, QueryCriteria } from '../index.js'
 import { expect } from 'chai'
 
 import { Collection } from '../src/core/database.js'
@@ -227,7 +227,7 @@ describe('DocuDB - Compression and Edge Cases', () => {
         ]
       })
 
-      const results = await productos.find(query)
+      const results = await productos.find(query as QueryCriteria)
       expect(results).to.have.lengthOf(3)
       expect(results.map(p => p.name)).to.have.members(['A', 'F', 'G'])
     })

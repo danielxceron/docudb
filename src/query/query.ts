@@ -164,7 +164,7 @@ class Query implements QueryInterface {
             }
             break
           case '$not':
-            if (this._evaluateCriteria(doc, criteria[key])) {
+            if (this._evaluateCriteria(doc, criteria[key] as QueryCriteria)) {
               return false
             }
             break
@@ -176,14 +176,14 @@ class Query implements QueryInterface {
         const value = this._getNestedValue(doc, key)
 
         // If criteria is an object, it may contain operators
-        if (criteria[key] !== null && typeof criteria[key] === 'object') {
+        if (criteria[key as keyof QueryCriteria] !== null && typeof criteria[key as keyof QueryCriteria] === 'object') {
           // Check each operator in criteria
-          for (const op in criteria[key]) {
-            if (!this._evaluateOperator(op, value, criteria[key][op])) {
+          for (const op in criteria[key as keyof QueryCriteria]) {
+            if (!this._evaluateOperator(op, value, criteria[key as keyof QueryCriteria][op])) {
               return false
             }
           }
-        } else if (!this._equals(value, criteria[key])) {
+        } else if (!this._equals(value, criteria[key as keyof QueryCriteria])) {
           return false
         }
       }
