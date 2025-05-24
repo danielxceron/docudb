@@ -27,7 +27,8 @@ import {
   Schema,
   IndexOptions,
   Index,
-  QueryCriteria
+  QueryCriteria,
+  QueryFieldName
 } from '../types/index.js'
 
 import { validatePath } from '../utils/pathValidator.js'
@@ -1177,7 +1178,7 @@ export class Collection {
    * Loads the collection metadata
    * @private
    */
-  async _loadMetadata (): Promise<void> {
+  private async _loadMetadata (): Promise<void> {
     try {
       if (await fileExists(this.metadataPath)) {
         const data = await readFilePromise(this.metadataPath, 'utf8')
@@ -1198,7 +1199,7 @@ export class Collection {
    * Stores the collection's metadata
    * @private
    */
-  async _saveMetadata (): Promise<void> {
+  private async _saveMetadata (): Promise<void> {
     try {
       await writeFilePromise(
         this.metadataPath,
@@ -1218,7 +1219,7 @@ export class Collection {
    * @returns {string} - Generated ID
    * @private
    */
-  _generateId (): string {
+  private _generateId (): string {
     // Check if UUID format is specified in options
     if (this.options.idType === 'uuid') {
       // Use crypto.randomUUID() for UUID v4 generation
@@ -1235,7 +1236,7 @@ export class Collection {
    * @returns {Object} - Updated document
    * @private
    */
-  _applyUpdate (doc: DocumentWithId, update: UpdateOperations): DocumentWithId {
+  private _applyUpdate (doc: DocumentWithId, update: UpdateOperations): DocumentWithId {
     const result = deepCopy(doc)
 
     if (update.$set == null && update.$unset == null && update.$inc == null) {
@@ -1281,7 +1282,7 @@ export class Collection {
    * @param {*} value - Value to set
    * @private
    */
-  _setNestedValue (obj: any, path: string, value: any): void {
+  private _setNestedValue (obj: any, path: string, value: any): void {
     const parts = path.split('.')
     let current = obj
 
@@ -1304,7 +1305,7 @@ export class Collection {
    * @param {string} path - Path to the value using dot notation
    * @private
    */
-  _unsetNestedValue (obj: any, path: string): void {
+  private _unsetNestedValue (obj: any, path: string): void {
     const parts = path.split('.')
     let current = obj
 
@@ -1326,7 +1327,7 @@ export class Collection {
    * @returns {*} - Found or undefined value
    * @private
    */
-  _getNestedValue (obj: any, path: string): any {
+  private _getNestedValue (obj: any, path: string): any {
     const parts = path.split('.')
     let current = obj
 
@@ -1349,7 +1350,7 @@ export class Collection {
    * @returns {Promise<DocumentWithId[]>} - All documents
    * @private
    */
-  async _loadAllDocuments (): Promise<DocumentWithId[]> {
+  private async _loadAllDocuments (): Promise<DocumentWithId[]> {
     try {
       const collectionDir = path.join(this.storage.dataDir, this.name)
       const items = await promisify(fs.readdir)(collectionDir, {
@@ -1406,10 +1407,10 @@ export class Collection {
    * @returns {Promise<DocumentWithId[]|null>} - Results or null if the optimization failed
    * @private
    */
-  async _findWithOptimization (query: Query): Promise<DocumentWithId[] | null> {
+  private async _findWithOptimization (query: Query): Promise<DocumentWithId[] | null> {
     for (const field in query.criteria) {
       if (this.indexManager.hasIndex(this.name, field)) {
-        const value = query.criteria[field]
+        const value = (query.criteria as QueryFieldName)[field]
 
         if (typeof value !== 'object' || value === null) {
           const docIds = this.indexManager.findByIndex(this.name, field, value)

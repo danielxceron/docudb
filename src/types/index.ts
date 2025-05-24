@@ -256,12 +256,20 @@ export interface ValidationRules {
 /**
  * Query criteria for filtering documents
 */
-export interface QueryCriteria extends QueryOperator {
-  [key: string]: any | QueryCriteria
-}
 
-export interface QueryOperator {
+export type QueryCriteria = QueryFieldName | QueryOperators
+export interface QueryFieldName {
+  /** Field name */
+  [key: string]: QueryOperators | string | number | boolean
+}
+export interface QueryOperators {
   /** Logical operators */
+
+  /** All operator
+ * @description Matches documents where the value of the field is an array and contains all the specified values
+ * @example { tags: { $all: ['tag1', 'tag2'] } }
+ */
+  $all?: QueryCriteria[]
 
   /** Or operator
    * @description Logical OR operator
@@ -356,12 +364,6 @@ export interface QueryOperator {
    * @example { tags: { $size: 2 } }
    */
   $size?: number
-
-  /** All operator
-   * @description Matches documents where the value of the field is an array and contains all the specified values
-   * @example { tags: { $all: ['tag1', 'tag2'] } }
-   */
-  $all?: any[]
 }
 
 /**
