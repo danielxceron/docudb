@@ -30,7 +30,7 @@ import {
   QueryCriteria
 } from '../types/index.js'
 
-import { validatePath, sanitizeName } from '../utils/pathValidator.js'
+import { validatePath } from '../utils/pathValidator.js'
 
 const mkdirPromise = promisify(fs.mkdir)
 const readFilePromise = promisify(fs.readFile)
@@ -298,6 +298,14 @@ export class Collection {
     this.options = options
     this.schema = options.schema != null ? options.schema : null
     this.documents = {} // Document cache
+    const validate = validatePath(this.name, storage.dataDir)
+
+    if (validate.safePath === null) {
+      throw new DocuDBError(
+      `Invalid collection name: ${validate.error ?? ''}`,
+      MCO_ERROR.COLLECTION.INVALID_NAME
+      )
+    }
     this.metadataPath = path.join(storage.dataDir, name, '_metadata.json')
     this.metadata = {
       count: 0,
@@ -314,23 +322,6 @@ export class Collection {
    */
   async initialize (): Promise<void> {
     try {
-      try {
-        // Validate that collection name is valid for a directory
-        const sanitizedName = sanitizeName(this.name)
-        if (sanitizedName.safePath === null) {
-          throw new Error(
-            `Invalid collection name: ${sanitizedName.error ?? ''}`
-          )
-        } else {
-          this.name = sanitizedName.safePath
-        }
-      } catch (error) {
-        throw new DocuDBError(
-          `Invalid collection name: ${(error as Error).message}`,
-          MCO_ERROR.COLLECTION.INVALID_NAME
-        )
-      }
-
       // Create collection directory if it doesn't exist
       await this.storage._ensureCollectionDir(this.name)
 

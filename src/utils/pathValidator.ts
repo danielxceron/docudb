@@ -157,9 +157,6 @@ function validatePath (userPath: string, baseDir: string): ValidatedPath {
 
     let cleanPath = validUserPath.safePath ?? ''
 
-    // Normalize base directory
-    const normalizedBaseDir = path.resolve(baseDir)
-
     // Additional cleaning for URL encoding
     try {
       cleanPath = decodeURIComponent(cleanPath)
@@ -178,12 +175,12 @@ function validatePath (userPath: string, baseDir: string): ValidatedPath {
     }
 
     // Create full path and resolve it
-    const fullPath = path.resolve(normalizedBaseDir, cleanPath)
+    const fullPath = path.resolve(baseDir, cleanPath)
 
     // Verify that path is within base directory
     if (
-      !fullPath.startsWith(normalizedBaseDir + path.sep) &&
-      fullPath !== normalizedBaseDir
+      !fullPath.startsWith(baseDir + path.sep) &&
+      fullPath !== baseDir
     ) {
       return {
         safePath: null,
@@ -192,7 +189,7 @@ function validatePath (userPath: string, baseDir: string): ValidatedPath {
     }
 
     // Final check - ensure the resolved path doesn't contain dangerous elements
-    const relativePath = path.relative(normalizedBaseDir, fullPath)
+    const relativePath = path.relative(baseDir, fullPath)
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       return {
         safePath: null,
