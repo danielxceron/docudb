@@ -1,6 +1,6 @@
 {
   "name": "docudb",
-  "version": "0.0.0-beta.1",
+  "version": "0.0.0-beta.2",
   "description": "Document-based NoSQL database for NodeJS",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
