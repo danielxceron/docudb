@@ -147,21 +147,12 @@ class Database {
       )
     }
 
-    // If collection doesn't exist, create it
-    if (typeof this.collections[collectionName] !== 'object') {
-      // Pass database idType to collection if not specified in options
-      const collectionOptions = {
-        ...options,
-        idType: options.idType
-      }
-
-      this.collections[collectionName] = new Collection(
-        collectionName,
-        this.storage,
-        this.indexManager,
-        collectionOptions
-      )
-    }
+    this.collections[collectionName] = new Collection(
+      collectionName,
+      this.storage,
+      this.indexManager,
+      options
+    )
 
     return this.collections[collectionName]
   }
