@@ -1,5 +1,9 @@
 # DocuDB
 
+[![npm version](https://img.shields.io/npm/v/docudb.svg)](https://www.npmjs.com/package/docudb)
+
+## Overview
+
 DocuDB is a lightweight, document-based NoSQL database for Node.js applications. It provides a MongoDB-like interface with zero external dependencies, making it perfect for small to medium-sized projects or environments where a full database installation is not feasible.
 
 ## Features
