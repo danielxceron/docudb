@@ -45,6 +45,8 @@ Primera versión pública estable del formato en disco **v2**.
 - Opción `compression: 'auto'`, `compressionLevel` y `cacheSize` (caché LRU).
 - TypeScript estricto, ESLint, CI en GitHub Actions (Linux y Windows) y
   micro benchmarks reproducibles con `npm run bench`.
+- Node.js 18 o posterior basta para ejecutar DocuDB (`engines.node: ">=18.0.0"`); CI
+  verifica 18, 20, 22 y 24 en Linux y Windows.
 
 ### Corregido
 

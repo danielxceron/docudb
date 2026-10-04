@@ -47,11 +47,20 @@
     "dist",
     "README.md",
     "README.es.md",
+    "CHANGELOG.md",
+    "CHANGELOG.es.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "RELEASING.md",
+    "docs",
     "LICENSE.txt"
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=22.15.0"
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
@@ -64,8 +73,9 @@
     "test:watch": "tsc -p tsconfig.test.json && mocha --watch",
     "bench": "npm run build:bench && node dist-bench/bench/bench.js",
     "build:bench": "tsc -p tsconfig.bench.json",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run docs:check && npm run build",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run docs:check && npm run build && npm run package:check",
     "docs:check": "node scripts/docs-check.mjs",
+    "package:check": "node scripts/package-check.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
@@ -105,8 +115,5 @@
       "no-control-regex": "off",
       "no-useless-escape": "off"
     }
-  },
-  "dependencies": {
-    "docudb": "file:docudb-0.1.0.tgz"
   }
 }

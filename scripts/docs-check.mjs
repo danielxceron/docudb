@@ -35,7 +35,8 @@ const PAIRS = [
 const BILINGUAL = [
   'CONTRIBUTING.md',
   'SECURITY.md',
-  'CODE_OF_CONDUCT.md'
+  'CODE_OF_CONDUCT.md',
+  'RELEASING.md'
 ]
 
 /** Marker that starts each half of a bilingual document */

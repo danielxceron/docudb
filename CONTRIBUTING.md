@@ -17,7 +17,7 @@ código.
 
 ### Requisitos
 
-- Node.js ≥ 22.15
+- Node.js ≥ 18
 - npm 10+
 
 ### Puesta en marcha
@@ -103,7 +103,7 @@ codebase.
 
 ### Requirements
 
-- Node.js ≥ 22.15
+- Node.js ≥ 18
 - npm 10+
 
 ### Getting started

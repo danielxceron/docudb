@@ -114,7 +114,7 @@ Muestra chunking, compresión, índices y concurrencia sin configurar nada exter
 npm install docudb
 ```
 
-Requiere **Node.js ≥ 22.15**. Funciona con `import` y con `require`.
+Requiere **Node.js ≥ 18**. Funciona con `import` y con `require`.
 
 ```typescript
 import { Database } from 'docudb'   // ESM
