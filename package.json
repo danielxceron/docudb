@@ -1,44 +1,72 @@
 {
   "name": "docudb",
-  "version": "0.0.0",
-  "description": "Document-based NoSQL database for NodeJS",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "prepare": "npm run build",
-    "test": "tsc && mocha dist/tests/**/*.js",
-    "test:mocha": "npm run build && mocha",
-    "lint": "ts-standard",
-    "lint:fix": "ts-standard --fix",
-    "lint:check": "ts-standard --verbose"
-  },
-  "files": [
-    "dist"
-  ],
+  "version": "0.1.0",
+  "description": "Embedded document-based NoSQL database for Node.js with MongoDB-like queries, zero runtime dependencies",
   "keywords": [
     "database",
     "nosql",
     "document-database",
+    "embedded",
+    "mongodb-like",
     "chunks",
     "compression",
+    "indexes",
+    "typescript",
+    "offline-first",
     "nodejs"
   ],
-  "author": "Daniel Cerón Claros",
-  "license": "MIT",
-  "engines": {
-    "node": ">=22.15.0",
-    "typescript": ">=5.8.3"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/danielxceron/DocuDB.git"
-  },
+  "homepage": "https://github.com/danielxceron/DocuDB#readme",
   "bugs": {
     "url": "https://github.com/danielxceron/DocuDB/issues"
   },
-  "homepage": "https://github.com/danielxceron/DocuDB#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danielxceron/DocuDB.git",
+    "directory": "."
+  },
+  "license": "MIT",
+  "author": "Daniel Cerón Claros",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.txt"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:types": "tsc --noEmit",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run verify",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build:test && mocha",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test:watch": "tsc -p tsconfig.test.json && mocha --watch",
+    "bench": "npm run build:bench && node dist-bench/bench/bench.js",
+    "build:bench": "tsc -p tsconfig.bench.json",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
   "devDependencies": {
     "@types/chai": "^5.2.2",
     "@types/mocha": "^10.0.10",
@@ -46,6 +74,7 @@
     "chai": "^5.2.0",
     "mocha": "^11.3.0",
     "ts-standard": "^12.0.2",
+    "tsup": "^8.5.0",
     "typescript": "^5.8.3"
   },
   "eslintConfig": {
@@ -54,14 +83,28 @@
       "project": "./tsconfig.json"
     },
     "ignorePatterns": [
-      "dist/**/*"
+      "dist/**/*",
+      "dist-bench/**/*",
+      "coverage/**/*",
+      "data/**/*"
     ],
     "rules": {
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/no-dynamic-delete": "off",
+      "@typescript-eslint/return-await": "off",
+      "@typescript-eslint/strict-boolean-expressions": "off",
+      "@typescript-eslint/consistent-type-assertions": "off",
+      "@typescript-eslint/no-invalid-void-type": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/promise-function-async": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/indent": "off",
       "no-template-curly-in-string": "off",
       "no-control-regex": "off",
       "no-useless-escape": "off"
     }
+  },
+  "dependencies": {
+    "docudb": "file:docudb-0.1.0.tgz"
   }
 }

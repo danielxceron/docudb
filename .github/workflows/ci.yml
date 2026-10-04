@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test ESM entry
+        run: node -e "import('./dist/index.mjs').then(m => { if (typeof m.Database !== 'function') throw new Error('missing Database'); console.log('esm ok') })"
+
+      - name: Smoke test CJS entry
+        run: node -e "const m = require('./dist/index.cjs'); if (typeof m.Database !== 'function') throw new Error('missing Database'); console.log('cjs ok')"
+
+      - name: Smoke test packed tarball
+        run: |
+          npm pack --silent
+          mkdir -p .smoke && cd .smoke
+          npm init -y > /dev/null
+          npm install ../docudb-*.tgz --silent
+          node -e "const { Database, Schema } = require('docudb'); console.log('cjs require ok:', typeof Database)"
+          node --input-type=module -e "import { Database } from 'docudb'; console.log('esm import ok:', typeof Database)"
+
+  publish:
+    name: publish
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

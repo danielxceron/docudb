@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/mocharc",
+  "spec": ["dist/tests/**/*.test.js"],
+  "timeout": 30000,
+  "recursive": true,
+  "reporter": "spec",
+  "diff": true
+}

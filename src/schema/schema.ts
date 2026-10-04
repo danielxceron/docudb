@@ -1,14 +1,15 @@
 /**
- * Schema module for data validation
- * Allows defining structure and validating documents
+ * Schema module for data validation.
+ * Allows defining the structure of a document and validating it on write.
  */
 
 import { MCO_ERROR, DocuDBError } from '../errors/errors.js'
 import {
   SchemaDefinition,
   SchemaOptions,
+  SchemaFieldType,
   ValidationRules,
-  Schema as SchemaInterface,
+  SchemaInterface,
   DocumentStructure
 } from '../types/index.js'
 
@@ -23,26 +24,56 @@ class Schema implements SchemaInterface {
    * @param definition - Schema definition with field types and validation rules
    * @param options - Additional schema options
    */
-  constructor (
-    definition: SchemaDefinition,
-    options: SchemaOptions = { idType: 'mongo' }
-  ) {
+  constructor (definition: SchemaDefinition, options: SchemaOptions = {}) {
     this.definition = definition
+    // `strict` defaults to false: unknown fields are preserved, not rejected.
     this.options = {
-      strict: options.strict !== false,
-      timestamps: options.timestamps === true,
-      ...options
+      idType: options.idType ?? 'mongo',
+      strict: options.strict === true,
+      timestamps: options.timestamps === true
     }
   }
 
   /**
-   * Validates a document against the schema
+   * Validates a document against the schema (synchronous).
+   *
+   * Custom validators must be synchronous; use {@link validateAsync} when an
+   * asynchronous validator (database check, HTTP call) is needed.
    * @param document - Document to validate
-   * @returns Validated and normalized document
-   * @throws {DocuDBError} - If the document does not comply with the schema
+   * @returns The validated and normalized document
    */
   validate (document: DocumentStructure): DocumentStructure {
-    if (typeof document !== 'object') {
+    const result = this._validateFields(document, false)
+    this._applyStrictRules(document, result)
+    this._applyTimestamps(document, result)
+    return result
+  }
+
+  /**
+   * Validates a document against the schema, awaiting async custom validators.
+   * @param document - Document to validate
+   * @returns The validated and normalized document
+   */
+  async validateAsync (document: DocumentStructure): Promise<DocumentStructure> {
+    const result = this._validateFields(document, true)
+    this._applyStrictRules(document, result)
+    await this._runAsyncValidators(document)
+    this._applyTimestamps(document, result)
+    return result
+  }
+
+  /**
+   * Validates every declared field: required, defaults, types and rules.
+   * @param document - Document to validate
+   * @param skipCustom - Skips custom validators (they are awaited separately)
+   * @returns Normalized document
+   * @private
+   */
+  private _validateFields (
+    document: DocumentStructure,
+    skipCustom: boolean
+  ): DocumentStructure {
+    if (typeof document !== 'object' || document === null || Array.isArray(document)) {
       throw new DocuDBError(
         'The document must be an object',
         MCO_ERROR.SCHEMA.INVALID_DOCUMENT
@@ -51,11 +82,9 @@ class Schema implements SchemaInterface {
 
     const validatedDoc: DocumentStructure = {}
 
-    // Validate each field according to the schema definition
     for (const [field, fieldDef] of Object.entries(this.definition)) {
       const value = document[field]
 
-      // Check if the field is required
       if (fieldDef.required === true && (value === undefined || value === null)) {
         throw new DocuDBError(
           `The '${field}' field is required`,
@@ -64,22 +93,16 @@ class Schema implements SchemaInterface {
         )
       }
 
-      // If the value is not defined and not required, use default value or skip
       if (value === undefined || value === null) {
         if ('default' in fieldDef) {
-          // Support for custom functions as default values
-          if (typeof fieldDef.default === 'function') {
-            // Pass the current document and field name to the function
-            validatedDoc[field] = fieldDef.default(document, field)
-          } else {
-            validatedDoc[field] = fieldDef.default
-          }
+          validatedDoc[field] = typeof fieldDef.default === 'function'
+            ? (fieldDef.default as (doc: DocumentStructure, name: string) => unknown)(document, field)
+            : defaultValueOf(fieldDef.default)
         }
         continue
       }
 
-      // Validate type
-      if (!this._validateType(value, fieldDef.type)) {
+      if (!matchesType(value, fieldDef.type)) {
         throw new DocuDBError(
           `The '${field}' field must be of type ${fieldDef.type}`,
           MCO_ERROR.SCHEMA.INVALID_TYPE,
@@ -87,201 +110,242 @@ class Schema implements SchemaInterface {
         )
       }
 
-      // Validate additional rules
       if (fieldDef.validate != null) {
-        try {
-          this._runValidators(value, fieldDef.validate, field, document)
-        } catch (error: any) {
-          throw new DocuDBError(
-            error.message,
-            error.code ?? MCO_ERROR.SCHEMA.VALIDATION_ERROR,
-            { field, ...error.details }
-          )
-        }
+        runSyncValidators(value, fieldDef.validate, field, document, skipCustom)
       }
 
-      // Apply transformations if they exist
-      if (
-        fieldDef.transform != null &&
-        typeof fieldDef.transform === 'function'
-      ) {
-        validatedDoc[field] = fieldDef.transform(value)
-      } else {
-        validatedDoc[field] = value
+      validatedDoc[field] = fieldDef.transform != null
+        ? fieldDef.transform(value)
+        : value
+    }
+
+    // Preserve fields that are not part of the definition (always allowed:
+    // they are handled by the strict-mode rule below).
+    for (const field of Object.keys(document)) {
+      if (!(field in this.definition) && !field.startsWith('_')) {
+        validatedDoc[field] = document[field]
       }
     }
 
-    // In strict mode, verify there are no additional fields
-    if (this.options?.strict === true) {
-      for (const field in document) {
-        if (!(field in this.definition) && !field.startsWith('_')) {
-          throw new DocuDBError(
-            `Field not allowed: '${field}'`,
-            MCO_ERROR.SCHEMA.INVALID_FIELD,
-            { field }
-          )
-        }
+    // Internal fields are never dropped, even when not declared.
+    for (const field of Object.keys(document)) {
+      if (field.startsWith('_')) {
+        validatedDoc[field] = document[field]
       }
-    }
-
-    // Add additional fields if not in strict mode
-    if (this.options?.strict !== true) {
-      for (const field in document) {
-        if (!(field in this.definition) && !field.startsWith('_')) {
-          validatedDoc[field] = document[field]
-        }
-      }
-    }
-
-    // Add timestamps if enabled
-    if (this.options?.timestamps === true) {
-      const now = new Date()
-      if (document?._createdAt === undefined) {
-        validatedDoc._createdAt = now
-      } else {
-        validatedDoc._createdAt = document._createdAt
-      }
-      validatedDoc._updatedAt = now
     }
 
     return validatedDoc
   }
 
   /**
-   * Validates the type of a value
-   * @param {*} value - Value to validate
-   * @param {string|Function} type - Expected type
-   * @returns {boolean} - Indicates if the value is of the expected type
+   * Awaits every asynchronous custom validator of the schema
+   * @param document - Document being validated
    * @private
    */
-  private _validateType (value: any, type: string | Function): boolean {
-    if (typeof type === 'function') {
-      return value instanceof type
-    }
+  private async _runAsyncValidators (document: DocumentStructure): Promise<void> {
+    for (const [field, fieldDef] of Object.entries(this.definition)) {
+      const custom = fieldDef.validate?.custom
+      if (custom == null) continue
 
-    switch (type) {
-      case 'string':
-        return typeof value === 'string'
-      case 'number':
-        return typeof value === 'number' && !isNaN(value)
-      case 'boolean':
-        return typeof value === 'boolean'
-      case 'date':
-        return value instanceof Date
-      case 'array':
-        return Array.isArray(value)
-      case 'object':
-        return (
-          typeof value === 'object' && value !== null && !Array.isArray(value)
-        )
-      default:
-        return true // Unknown type, assume valid
+      const value = document[field]
+      if (value === undefined || value === null) continue
+
+      const result = await custom(value, document)
+      assertCustomResult(result, fieldDef.validate as ValidationRules, field, value)
     }
   }
 
   /**
-   * Executes custom validators
-   * @param {*} value - Value to validate
-   * @param {Function|Array|Object} validators - Validators to execute
-   * @param {string} field - Field name being validated
-   * @param {DocumentStructure} document - The complete document being validated
-   * @returns {void} - Throws an error if validation fails
+   * Applies the strict mode rule
+   * @param document - Original document
+   * @param validatedDoc - Normalized document (mutated when rejecting)
    * @private
    */
-  private _runValidators (value: any, validators: ValidationRules, field: string, document?: DocumentStructure): void {
-    // Validate min/max for numbers
-    if (typeof value === 'number') {
-      if ((validators.min !== undefined) && value < validators.min) {
+  private _applyStrictRules (
+    document: DocumentStructure,
+    validatedDoc: DocumentStructure
+  ): void {
+    if (this.options.strict !== true) return
+
+    for (const field of Object.keys(document)) {
+      if (!(field in this.definition) && !field.startsWith('_')) {
         throw new DocuDBError(
-          validators.message ?? `The value must be greater than or equal to ${validators.min}`,
-          MCO_ERROR.SCHEMA.INVALID_VALUE,
-          { field, value, min: validators.min }
-        )
-      }
-      if ((validators.max !== undefined) && value > validators.max) {
-        throw new DocuDBError(
-          validators.message ?? `The value must be less than or equal to ${validators.max}`,
-          MCO_ERROR.SCHEMA.INVALID_VALUE,
-          { field, value, max: validators.max }
+          `Field not allowed: '${field}'`,
+          MCO_ERROR.SCHEMA.INVALID_FIELD,
+          { field }
         )
       }
     }
+    // Document is valid; keep the normalized version.
+    void validatedDoc
+  }
 
-    // Validate minLength/maxLength for strings and arrays
-    if (typeof value === 'string' || Array.isArray(value)) {
-      if ((validators.minLength !== undefined) && value.length < validators.minLength) {
-        throw new DocuDBError(
-          validators.message ?? `The length must be greater than or equal to ${validators.minLength}`,
-          MCO_ERROR.SCHEMA.INVALID_LENGTH,
-          {
-            field,
-            value,
-            minLength: validators.minLength,
-            currentLength: value.length
-          }
-        )
-      }
-      if ((validators.maxLength !== undefined) && value.length > validators.maxLength) {
-        throw new DocuDBError(
-          validators.message ?? `The length must be less than or equal to ${validators.maxLength}`,
-          MCO_ERROR.SCHEMA.INVALID_LENGTH,
-          {
-            field,
-            value,
-            maxLength: validators.maxLength,
-            currentLength: value.length
-          }
-        )
-      }
-    }
+  /**
+   * Maintains `_createdAt` / `_updatedAt` when enabled
+   * @param document - Original document
+   * @param validatedDoc - Normalized document (mutated)
+   * @private
+   */
+  private _applyTimestamps (
+    document: DocumentStructure,
+    validatedDoc: DocumentStructure
+  ): void {
+    if (this.options.timestamps !== true) return
 
-    // Validate pattern for strings
-    if (typeof value === 'string' && validators.pattern != null) {
-      const pattern =
-        validators.pattern instanceof RegExp
-          ? validators.pattern
-          : new RegExp(validators.pattern)
+    const now = new Date()
+    validatedDoc._createdAt = (document._createdAt as Date | undefined) ?? now
+    validatedDoc._updatedAt = now
+  }
+}
 
-      if (!pattern.test(value)) {
-        throw new DocuDBError(
-          validators.message ?? 'Does not match the required pattern',
-          MCO_ERROR.SCHEMA.INVALID_REGEX,
-          { field, value, pattern: pattern.toString() }
-        )
-      }
-    }
+/**
+ * Clones default values so that mutable defaults (`[]`, `{}`) are never shared
+ * between documents.
+ * @param value - Configured default
+ * @returns A fresh value
+ */
+function defaultValueOf (value: unknown): unknown {
+  if (Array.isArray(value)) return [...value]
+  if (value instanceof Date) return new Date(value.getTime())
+  if (value !== null && typeof value === 'object') return { ...(value) }
+  return value
+}
 
-    // Validate enum
-    if (validators.enum != null && !validators.enum.includes(value)) {
+/**
+ * Type check for schema fields
+ * @param value - Value to check
+ * @param type - Expected type
+ * @returns true when the value matches
+ */
+function matchesType (value: unknown, type: SchemaFieldType): boolean {
+  switch (type) {
+    case 'string': return typeof value === 'string'
+    case 'number': return typeof value === 'number' && Number.isFinite(value)
+    case 'int': return typeof value === 'number' && Number.isInteger(value)
+    case 'boolean': return typeof value === 'boolean'
+    case 'date': return value instanceof Date && !Number.isNaN(value.getTime())
+    case 'array': return Array.isArray(value)
+    case 'object':
+      return value !== null && typeof value === 'object' && !Array.isArray(value) &&
+        !(value instanceof Date)
+    case 'null': return value === null
+    /* istanbul ignore next - unknown types are accepted */
+    default: return true
+  }
+}
+
+/**
+ * Runs every declarative validation rule plus custom validators
+ * @param value - Field value
+ * @param rules - Validation rules
+ * @param field - Field name
+ * @param document - Whole document, forwarded to custom validators
+ * @param skipCustom - Skips custom validators (they are awaited separately)
+ * @private
+ */
+function runSyncValidators (
+  value: unknown,
+  rules: ValidationRules,
+  field: string,
+  document: DocumentStructure,
+  skipCustom: boolean
+): void {
+  if (typeof value === 'number') {
+    if (rules.min !== undefined && value < rules.min) {
       throw new DocuDBError(
-        validators.message ?? `The value must be one of: ${validators.enum.join(', ')}`,
-        MCO_ERROR.SCHEMA.INVALID_ENUM,
-        { field, value, allowedValues: validators.enum }
+        rules.message ?? `The value must be greater than or equal to ${rules.min}`,
+        MCO_ERROR.SCHEMA.INVALID_VALUE,
+        { field, value, min: rules.min }
       )
     }
-
-    // Run custom validator if provided
-    if (validators.custom != null) {
-      const result = validators.custom(value, document)
-
-      // If result is a string, it's an error message
-      if (typeof result === 'string') {
-        throw new DocuDBError(
-          result,
-          MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
-          { field, value }
-        )
-      }
-
-      // If result is false, validation failed
-      if (result === false) {
-        throw new DocuDBError(
-          validators.message ?? 'Failed custom validation',
-          MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
-          { field, value }
-        )
-      }
+    if (rules.max !== undefined && value > rules.max) {
+      throw new DocuDBError(
+        rules.message ?? `The value must be less than or equal to ${rules.max}`,
+        MCO_ERROR.SCHEMA.INVALID_VALUE,
+        { field, value, max: rules.max }
+      )
     }
+  }
+
+  if (typeof value === 'string' || Array.isArray(value)) {
+    const length = (value as string | unknown[]).length
+    if (rules.minLength !== undefined && length < rules.minLength) {
+      throw new DocuDBError(
+        rules.message ?? `The length must be greater than or equal to ${rules.minLength}`,
+        MCO_ERROR.SCHEMA.INVALID_LENGTH,
+        { field, value, minLength: rules.minLength, currentLength: length }
+      )
+    }
+    if (rules.maxLength !== undefined && length > rules.maxLength) {
+      throw new DocuDBError(
+        rules.message ?? `The length must be less than or equal to ${rules.maxLength}`,
+        MCO_ERROR.SCHEMA.INVALID_LENGTH,
+        { field, value, maxLength: rules.maxLength, currentLength: length }
+      )
+    }
+  }
+
+  if (typeof value === 'string' && rules.pattern != null) {
+    const pattern = rules.pattern instanceof RegExp
+      ? rules.pattern
+      : new RegExp(rules.pattern)
+    if (!pattern.test(value)) {
+      throw new DocuDBError(
+        rules.message ?? 'Does not match the required pattern',
+        MCO_ERROR.SCHEMA.INVALID_REGEX,
+        { field, value, pattern: pattern.toString() }
+      )
+    }
+  }
+
+  if (rules.enum != null && !rules.enum.includes(value)) {
+    throw new DocuDBError(
+      rules.message ?? `The value must be one of: ${rules.enum.join(', ')}`,
+      MCO_ERROR.SCHEMA.INVALID_ENUM,
+      { field, value, allowedValues: rules.enum }
+    )
+  }
+
+  if (rules.custom != null && !skipCustom) {
+    const result = rules.custom(value, document)
+    if (typeof result === 'object' && result !== null && typeof (result as Promise<unknown>).then === 'function') {
+      throw new DocuDBError(
+        'Asynchronous validators require Schema.validateAsync()',
+        MCO_ERROR.SCHEMA.ASYNC_VALIDATOR,
+        { field }
+      )
+    }
+    assertCustomResult(result as boolean | string | void, rules, field, value)
+  }
+}
+
+/**
+ * Interprets the return value of a custom validator
+ * @param result - Validator result
+ * @param rules - Validation rules
+ * @param field - Field name
+ * @param value - Field value
+ * @private
+ */
+function assertCustomResult (
+  result: boolean | string | void,
+  rules: ValidationRules,
+  field: string,
+  value: unknown
+): void {
+  if (typeof result === 'string') {
+    throw new DocuDBError(
+      result,
+      MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
+      { field, value }
+    )
+  }
+  if (result === false) {
+    throw new DocuDBError(
+      rules.message ?? 'Failed custom validation',
+      MCO_ERROR.SCHEMA.CUSTOM_VALIDATION_ERROR,
+      { field, value }
+    )
   }
 }
 

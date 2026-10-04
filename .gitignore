@@ -1,4 +1,27 @@
+# Dependencies
 node_modules/
-data/
+
+# Build output
 dist/
-package-lock.json
+dist-bench/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+.coverage/
+
+# Local data written by tests and benchmarks
+data/
+*.bak-*/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
