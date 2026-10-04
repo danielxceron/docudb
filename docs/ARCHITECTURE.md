@@ -1,32 +1,35 @@
-# DocuDB
+# Architecture
 
-Base de datos documental NoSQL embebida para Node.js: API tipo MongoDB, cero dependencias en runtime y almacenamiento en archivos locales.
+> 🇬🇧 **English** · 🇪🇸 [Español](ARCHITECTURE.es.md)
 
-## Arquitectura en una página
+DocuDB is an **embedded** NoSQL document database for Node.js: MongoDB-like API,
+zero runtime dependencies and storage in local files.
+
+## One-page overview
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ index.ts                     API pública (ESM + CJS + tipos)  │
+│ index.ts                     Public API (ESM + CJS + types)  │
 ├──────────────────────────────────────────────────────────────┤
 │ src/core/database.ts         Database + Collection            │
-│   ├─ Collection<T>           CRUD, lotes, posiciones, stats   │
-│   └─ Database                ciclo de vida, backup, migración │
+│   ├─ Collection<T>           CRUD, bulk, positions, stats     │
+│   └─ Database                lifecycle, backup, migration     │
 ├──────────────────────────────────────────────────────────────┤
-│ src/query/query.ts           compilador de criterios → predicado│
-│ src/aggregation/aggregate.ts pipeline $match…$unwind           │
-│ src/schema/schema.ts         validación declarativa            │
+│ src/query/query.ts           criteria → compiled predicate    │
+│ src/aggregation/aggregate.ts $match…$unwind pipeline          │
+│ src/schema/schema.ts         declarative validation           │
 ├──────────────────────────────────────────────────────────────┤
-│ src/index/indexManager.ts    índices en memoria + snapshots   │
-│ src/storage/fileStorage.ts   formato v2 en disco + gzip       │
-│ src/compression/gzip.ts      zlib                              │
+│ src/index/indexManager.ts    in-memory indexes + snapshots    │
+│ src/storage/fileStorage.ts   v2 on-disk format + gzip        │
+│ src/compression/gzip.ts      zlib                             │
 ├──────────────────────────────────────────────────────────────┤
-│ src/utils/*                  rutas, atajos de I/O, mutex, UUID │
-│ src/errors/errors.ts         MCO_ERROR + DocuDBError           │
-│ src/types/index.ts           contrato de tipos                 │
+│ src/utils/*                  paths, I/O helpers, mutex, UUID  │
+│ src/errors/errors.ts         MCO_ERROR + DocuDBError          │
+│ src/types/index.ts           type contract                    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## Formato en disco (v2)
+## On-disk format (v2)
 
 ```
 data/
@@ -34,81 +37,82 @@ data/
 └── <db>/
     ├── _database.json
     └── <collection>/
-        ├── _metadata.json                # count, nextSeq, indices — tamaño constante
-        ├── _order.log                    # log append-only: {s,i} | {d} | {o}
-        ├── _indices/<field>[+field].idx   # snapshot de índice
-        └── docs/<id>.json[.gz]            # un archivo por documento
-            <id>.part-NNNN.json[.gz]       # N archivos si supera chunkSize
+        ├── _metadata.json                # count, nextSeq, indexes — constant size
+        ├── _order.log                    # append-only log: {s,i} | {d} | {o}
+        ├── _indices/<field>[+field].idx   # index snapshot
+        └── docs/<id>.json[.gz]            # one file per document
+            <id>.part-NNNN.json[.gz]       # N files when it exceeds chunkSize
 ```
 
-Cuatro decisiones explican el rendimiento actual:
+Four decisions explain the current performance:
 
-1. **Un archivo por documento en lugar de un directorio con N archivos.**
-   Un directorio más un archivo por documento costaba dos entradas de sistema de
-   archivos por documento; ahora cuesta una.
+1. **One file per document instead of a directory with N files.**
+   A directory plus a file per document cost two filesystem entries per
+   document; now it costs one.
 
-2. **Metadata de tamaño constante.** El orden de inserción **no** se guarda como
-   un array en `_metadata.json` (eso hacía que cada insert reescribiera un
-   archivo O(n), convirtiendo una carga de 10 000 documentos en O(n²)). Se guarda
-   en `_order.log`, un log append-only: insertar cuesta un `append`.
+2. **Constant-size metadata.** Insertion order is **not** stored as an array in
+   `_metadata.json` (that made every insert rewrite an O(n) file, turning a
+   10 000-document load into O(n²)). It lives in `_order.log`, an append-only
+   log: inserting costs one `append`.
 
-3. **Escrituras atómicas.** Todo archivo se escribe como temporal + `rename`, y
-   las escrituras al mismo destino se serializan con un mutex por ruta. En
-   Windows `rename` sobre un archivo abierto por otro handle falla con `EPERM`,
-   así que el rename además reintenta ante errores transitorios.
+3. **Atomic writes.** Every file is written as a temporary file plus `rename`,
+   and writes to the same destination are serialized with a per-path mutex. On
+   Windows, `rename` onto a file another handle still holds open fails with
+   `EPERM`, so the rename also retries on transient errors.
 
-4. **Índices con mapa inverso.** Un índice es
-   `Map<valueKey, Set<docId>>` más `Map<docId, Set<valueKey>>`. Quitar un
-   documento del índice es O(claves de ese documento) en lugar de recorrer todas
-   las claves del índice. Los snapshots se escriben de forma diferida (bandera de
-   sucio + `flushInterval`), nunca en cada escritura.
+4. **Indexes with a reverse map.** An index is
+   `Map<valueKey, Set<docId>>` plus `Map<docId, Set<valueKey>>`. Removing a
+   document from an index costs O(its own keys) instead of walking every key in
+   the index. Snapshots are written lazily (dirty flag plus `flushInterval`),
+   never on every write.
 
-## Concurrencia
+## Concurrency
 
-- **Dentro de un proceso**: `KeyedMutex` (`src/utils/mutex.ts`) serializa las
-  operaciones por documento con una cadena de promesas FIFO. El lock se toma
-  **antes** de leer, no después, lo que elimina la ventana de *lost update*.
-  Antes se usaba un `global._documentLocks` con *spin-wait* y `setTimeout`, que
-  además colisionaba entre bases de datos distintas.
-- **Entre procesos**: opcional mediante `fileLock: true`, que toma un `_lock`
-  con `open(path, 'wx')` y detecta procesos muertos.
+- **Within one process**: `KeyedMutex` (`src/utils/mutex.ts`) serializes
+  per-document operations with a FIFO promise chain. The lock is taken
+  **before** reading, not after, which removes the lost-update window. It used
+  to be a `global._documentLocks` spin-wait with `setTimeout`, which also
+  collided between distinct databases.
+- **Across processes**: opt-in via `fileLock: true`, which takes a `_lock` with
+  `open(path, 'wx')` and detects dead processes.
 
-## Motor de consulta
+## Query engine
 
-`compileCriteria()` recorre el árbol de criterios **una vez** y devuelve un
-closure. Antes se re-interpretaba el árbol por cada documento. Los predicados
-operan sobre los valores del documento mediante `getNestedValue`, con notación
-de puntos y soporte de índices numéricos de array.
+`compileCriteria()` walks the criteria tree **once** and returns a closure.
+Previously the tree was re-interpreted for every document. Predicates operate on
+the values taken from the document through `getNestedValue`, with dot notation
+and support for numeric array indexes.
 
-`sort` usa un orden total explícito (`undefined < null < boolean < number <
-string < Date < array < object`) para que ordenar nunca devuelva un orden
-arbitrario cuando faltan campos.
+`sort` uses an explicit total order (`undefined < null < boolean < number <
+string < Date < array < object`) so sorting never returns an arbitrary order
+when fields are missing.
 
-## Búsqueda con índices
+## Indexed lookups
 
-`Collection._findWithOptimization()` busca un campo del criterio con índice,
-delega en `IndexManager.lookup()` y después re-verifica el predicado completo
-sobre los candidatos. Soporta igualdad, conjuntos, rangos y negaciones; los
-índices compuestos se consultan por prefijo. `explain()` expone el plan para
-poder verificar en tests que el índice se está usando.
+`Collection._findWithOptimization()` looks for an indexed field in the criteria,
+delegates to `IndexManager.lookup()` and then re-checks the full predicate over
+the candidates. It supports equality, sets, ranges and negations; compound
+indexes are queried by prefix. `explain()` exposes the plan, so tests can assert
+that the index is actually being used.
 
-## Versionado del formato
+## Format versioning
 
-`FORMAT_VERSION` vive en `src/types/index.ts`. Al abrir una base de datos:
+`FORMAT_VERSION` lives in `src/types/index.ts`. When opening a database:
 
-- Directorio vacío → se adopta la versión actual.
-- Manifiesto con versión mayor → error `DB015`.
-- Manifiesto con versión menor (o directorios con documentos v1) → error `DB015`
-  indicando que hay que migrar.
+- Empty directory → the current version is adopted.
+- Manifest with a higher version → `DB015` error.
+- Manifest with a lower version (or directories holding v1 documents) → `DB015`
+  error stating that a migration is required.
 
-`migrateDatabase()` implementa v1 → v2: lee cada documento con el lector v1, lo
-escribe con el escritor v2, lo relee y compara; solo después borra el formato
-anterior. Con `backup: true` copia antes el árbol completo.
+`migrateDatabase()` implements v1 → v2: it reads each document with the v1
+reader, writes it with the v2 writer, reads it back and compares; only afterwards
+does it remove the previous format. With `backup: true` it copies the whole tree
+first.
 
-## Puntos de extensión
+## Extension points
 
-- `Schema` acepta validadores `custom` asíncronos (`validateAsync`).
-- `logger` permite recibir diagnósticos sin que la librería escriba en la consola.
-- `compression: 'auto'` decide por tamaño, y `compressionLevel` ajusta gzip.
-- `KeyedMutex`, `deepCopy` y los ayudantes de rutas se exportan por si quieres
-  reutilizarlos.
+- `Schema` accepts async `custom` validators (`validateAsync`).
+- `logger` receives diagnostics without the library writing to the console.
+- `compression: 'auto'` decides by size, and `compressionLevel` tunes gzip.
+- `KeyedMutex`, `deepCopy` and the path helpers are exported in case you want to
+  reuse them.

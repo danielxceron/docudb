@@ -1,36 +1,38 @@
 # DocuDB
 
+> 🇬🇧 **English** · 🇪🇸 [Español](README.es.md)
+
 [![npm version](https://img.shields.io/npm/v/docudb.svg)](https://www.npmjs.com/package/docudb)
 [![CI](https://img.shields.io/actions/workflow/status/danielxceron/DocuDB/ci.yml?label=CI&style=flat-square)](https://github.com/danielxceron/DocuDB/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE.txt)
 [![types](https://img.shields.io/badge/types-TypeScript-3178c6)](https://www.typescriptlang.org/)
-[![runtime deps](https://img.shields.io/badge/runtime%20deps-0-success)](#características)
+[![runtime deps](https://img.shields.io/badge/runtime%20deps-0-success)](#features)
 [![node](https://img.shields.io/badge/node-%3E%3D22.15-5FA04E)](https://nodejs.org)
 
-Base de datos documental NoSQL **embebida** para Node.js. API tipo MongoDB, **cero dependencias en runtime**, almacenamiento en archivos locales, escrituras atómicas y formato en disco versionado.
+**Embedded** NoSQL document database for Node.js. MongoDB-like API, **zero runtime dependencies**, local file storage, atomic writes and a versioned on-disk format.
 
-> **TL;DR** — `npm install docudb`, defines un esquema, insertas documentos JSON y los consultas con una sintaxis que ya conoces. Sin servidor, sin `docker-compose`, sin configuración.
+> **TL;DR** — `npm install docudb`, define a schema, insert JSON documents and query them with syntax you already know. No server, no `docker-compose`, no configuration.
 
 ---
 
-## Cuándo usar DocuDB
+## When to use DocuDB
 
-| Úsalo cuando… | No lo uses cuando… |
+| Use it when… | Don't use it when… |
 |---|---|
-| Necesitas persistencia **sin infraestructura** | Necesitas varios procesos o servidores escribiendo a la vez |
-| Trabajas en **un solo proceso Node.js** | Necesitas réplicas, particionado o alta concurrencia de escrituras |
-| El dataset cabe en decenas o cientos de miles de documentos | El dataset pesa varios GB o requiere consultas analíticas |
-| Quieres **tipado estático** de tus documentos | Necesitas transacciones distribuidas o alta disponibilidad |
-| Estás construyendo un prototipo, CLI o app de escritorio | Necesitas búsqueda de texto completo |
+| You need persistence **without infrastructure** | You need several processes or servers writing at once |
+| You work in **a single Node.js process** | You need replicas, partitioning or high write concurrency |
+| The dataset fits in tens or hundreds of thousands of documents | The dataset weighs several GB or needs analytical queries |
+| You want **static typing** for your documents | You need distributed transactions or high availability |
+| You are building a prototype, a CLI or a desktop app | You need full-text search |
 
-DocuDB es una base de datos **de proceso único**. Lee [Límites y rendimiento](#límites-y-rendimiento) antes de decidir.
+DocuDB is a **single-process** database. Read [Limits and performance](#limits-and-performance) before deciding.
 
 ---
 
-## Casos de uso
+## Use cases
 
-### 1. Aplicaciones de escritorio y CLI (offline por diseño)
-Electron, Tauri, extensiones de VS Code o cualquier CLI necesitan guardar preferencias, caché o estado sin depender de un servidor. DocuDB escribe en el directorio de datos del usuario y funciona sin red.
+### 1. Desktop apps and CLIs (offline by design)
+Electron, Tauri, VS Code extensions or any CLI need to store preferences, cache or state without depending on a server. DocuDB writes to the user's data directory and works without a network.
 
 ```typescript
 const db = new Database({ name: 'app', dataDir: userDataDir })
@@ -38,11 +40,11 @@ const settings = db.collection('settings', { schema: settingsSchema })
 await settings.updateById('theme', { $set: { value: 'dark' } })
 ```
 
-### 2. Prototipos y MVP en minutos
-Sustituye a SQLite o a un MongoDB en docker-compose mientras validas la idea. Migrar más adelante es reescribir la capa de acceso.
+### 2. Prototypes and MVPs in minutes
+Replace SQLite or a docker-compose MongoDB while you validate the idea. Migrating later means rewriting the access layer.
 
-### 3. Pruebas automatizadas sin mocks ni contenedores
-Cada suite levanta su base de datos en un directorio temporal: sin Docker, sin bases compartidas, sin estado residual.
+### 3. Automated tests without mocks or containers
+Every suite spins up its own database in a temporary directory: no Docker, no shared databases, no leftover state.
 
 ```typescript
 beforeEach(async () => {
@@ -53,64 +55,64 @@ beforeEach(async () => {
 afterEach(async () => db.close())
 ```
 
-### 4. Patrón outbox: buffering local antes de enviar
-Eventos, telemetría o notificaciones se escriben primero en disco y un worker posterior los drena a tu backend. Si el servicio remoto cae, los datos no se pierden.
+### 4. Outbox pattern: local buffering before sending
+Events, telemetry or notifications are written to disk first and a later worker drains them to your backend. If the remote service goes down, nothing is lost.
 
 ```typescript
 const outbox = db.collection('outbox')
-await outbox.insertMany(events)                 // rápido, sin red
+await outbox.insertMany(events)                 // fast, no network
 setInterval(() => flushToRemote(outbox), 5_000)
 ```
 
-### 5. Cachés y colas locales de trabajos
-Jobs pendientes, resultados de cómputos, feature flags o respuestas memoizadas: todo con consulta por índice en vez de un `Map` en memoria que se pierde al reiniciar.
+### 5. Local caches and job queues
+Pending jobs, computation results, feature flags or memoized responses: all with indexed queries instead of an in-memory `Map` that is lost on restart.
 
-### 6. IoT, kioscos y Raspberry Pi
-Sin servidor de base de datos en el campo, sin dependencias del sistema, y con un formato de archivos que puedes respaldar con `tar` o `rsync`.
+### 6. IoT, kiosks and Raspberry Pi
+No database server in the field, no system dependencies, and a file format you can back up with `tar` or `rsync`.
 
-### 7. Educación: implementar una base de datos desde cero
-Chunking, índices, compresión, esquemas de validación, control de concurrencia y un motor de consultas tipo MongoDB en unas 4 000 líneas de TypeScript legible.
+### 7. Education: building a database from scratch
+Chunking, indexes, compression, validation schemas, concurrency control and a MongoDB-like query engine in roughly 4 000 lines of readable TypeScript.
 
-### 8. Configuración versionable
-Guarda ajustes, feature flags o datos de referencia en archivos versionables con Git y con diffs legibles.
+### 8. Versionable configuration
+Keep settings, feature flags or reference data in files you can commit to Git and diff meaningfully.
 
-### 9. Apps personales
-Notas, recetas, finanzas, biblioteca o registros de hábitos: datos estructurados con validación, sin administración, sin cuenta ni nube.
+### 9. Personal apps
+Notes, recipes, finances, a library or habit trackers: structured data with validation, no administration, no account, no cloud.
 
-### 10. Offline-first y edge
-En dispositivos con conectividad intermitente, DocuDB es la capa local; la sincronización con el servidor la implementas tú.
+### 10. Offline-first and edge
+On devices with intermittent connectivity, DocuDB is the local layer; synchronizing with the server is up to you.
 
-### 11. Staging para ETL
-Vaciar transformaciones en una colección intermedia antes de cargarlas en su destino, con validación de esquema y consultas de control.
+### 11. ETL staging
+Drain transformations into an intermediate collection before loading them into the destination, with schema validation and control queries.
 
-### 12. Accesorios de servidor y teach storage
-Muestra chunking, compresión, índices y concurrencia sin configurar nada externo.
-
----
-
-## Características
-
-- **Documentos JSON** con `_id` automático estilo Mongo (12 bytes) o **UUID v4**
-- **Esquemas** con tipos, requeridos, valores por defecto (incluidos funciones y validadores asíncronos), `transform`, `enum`, `pattern`, `min`/`max`, `minLength`/`maxLength` y validadores personalizados
-- **Consultas estilo MongoDB**: `$eq $ne $gt $gte $lt $lte $in $nin $exists $regex $size $all $elemMatch $type` + `$and $or $nor $not`, con notación de puntos
-- **Ordenación, salto, límite y proyección** de resultados
-- **Índices** simples, compuestos, únicos y sparse, conequality, rangos y conjuntos, más `explain()`
-- **Operaciones de lote**: `insertMany`, `bulkWrite`, `updateMany`, `deleteMany`
-- **Agregación** con `$match $project $group $sort $skip $limit $count $unwind`
-- **Compresión gzip** (`true` / `false` / `'auto'`) y **chunking** automático
-- **Escrituras atómicas** (archivo temporal + `rename`) y **migración de formato** verificada
-- **TypeScript** de principio a fin, con genéricos por colección
-- **ESM y CommonJS**, sin dependencias en runtime
+### 12. Server sidecars and teaching storage
+Show chunking, compression, indexes and concurrency without configuring anything external.
 
 ---
 
-## Instalación
+## Features
+
+- **JSON documents** with an automatic Mongo-style `_id` (12 bytes) or **UUID v4**
+- **Schemas** with types, required fields, default values (including functions and async validators), `transform`, `enum`, `pattern`, `min`/`max`, `minLength`/`maxLength` and custom validators
+- **MongoDB-like queries**: `$eq $ne $gt $gte $lt $lte $in $nin $exists $regex $size $all $elemMatch $type` + `$and $or $nor $not`, with dot notation
+- **Sorting, skipping, limiting and projection** of results
+- **Indexes**: simple, compound, unique and sparse, covering equality, ranges and sets, plus `explain()`
+- **Batch operations**: `insertMany`, `bulkWrite`, `updateMany`, `deleteMany`
+- **Aggregation** with `$match $project $group $sort $skip $limit $count $unwind`
+- **gzip compression** (`true` / `false` / `'auto'`) and automatic **chunking**
+- **Atomic writes** (temporary file + `rename`) and verified **format migration**
+- **TypeScript** end to end, with generics per collection
+- **ESM and CommonJS**, with zero runtime dependencies
+
+---
+
+## Installation
 
 ```bash
 npm install docudb
 ```
 
-Requiere **Node.js ≥ 22.15**. Funciona con `import` y con `require`.
+Requires **Node.js ≥ 22.15**. Works with both `import` and `require`.
 
 ```typescript
 import { Database } from 'docudb'   // ESM
@@ -119,7 +121,7 @@ const { Database } = require('docudb') // CommonJS
 
 ---
 
-## Inicio rápido
+## Quick start
 
 ```typescript
 import { Database, Schema } from 'docudb'
@@ -142,10 +144,10 @@ const adults = await users.find({ age: { $gte: 18 } }, { sort: { age: -1 }, limi
 await users.updateById(user._id, { $set: { age: 37 } })
 await users.deleteById(user._id)
 
-await db.close()   // vacía buffers y libera la base de datos
+await db.close()   // flushes buffers and releases the database
 ```
 
-### Tipado por colección
+### Typed collections
 
 ```typescript
 interface User { name: string; email: string; age: number }
@@ -155,51 +157,51 @@ await users.insertOne({ name: 'Ada', email: 'ada@example.com', age: 36 })
 const adults = await users.find({ age: { $gte: 18 } })
 ```
 
-También puedes derivar el tipo de un esquema con `InferSchema<typeof definition>`.
+You can also derive the type from a schema with `InferSchema<typeof definition>`.
 
 ---
 
-## Configuración
+## Configuration
 
-### Base de datos
+### Database
 
 ```typescript
 const db = new Database({
-  name: 'myDatabase',        // nombre lógico (validado contra una allowlist)
-  dataDir: './data',         // directorio raíz; la base vive en <dataDir>/<name>
-  chunkSize: 1024 * 1024,    // 1 MiB: tamaño máximo por fragmento
+  name: 'myDatabase',        // logical name (validated against an allowlist)
+  dataDir: './data',         // root directory; the database lives in <dataDir>/<name>
+  chunkSize: 1024 * 1024,    // 1 MiB: maximum size per chunk
   compression: true,         // true | false | 'auto'
   idType: 'mongo',           // 'mongo' | 'uuid'
-  cacheSize: 1000,           // documentos en caché LRU
-  flushInterval: 0,          // >0 agrupa las escrituras de metadata cada N ms
-  fileLock: false,           // true impide que otro proceso abra el directorio
-  logger: undefined          // la librería nunca escribe en la consola por su cuenta
+  cacheSize: 1000,           // documents in the LRU cache
+  flushInterval: 0,          // >0 groups metadata writes every N ms
+  fileLock: false,           // true prevents another process from opening the directory
+  logger: undefined          // the library never writes to the console on its own
 })
 await db.initialize()
 ```
 
-### Colección
+### Collection
 
 ```typescript
 const orders = db.collection('orders', {
   schema: orderSchema,
   idType: 'uuid',
-  timestamps: true   // añade createdAt / updatedAt
+  timestamps: true   // adds createdAt / updatedAt
 })
 ```
 
-### Apagado ordenado
+### Orderly shutdown
 
 ```typescript
-await db.flush()   // escribe lo pendiente sin cerrar
-await db.close()   // flush + libera timers y el lock file
+await db.flush()   // writes pending changes without closing
+await db.close()   // flush + releases timers and the lock file
 ```
 
-`flushInterval: 0` (por defecto) escribe cada cambio: máxima durabilidad. Con un valor mayor se agrupan las escrituras de metadata, lo que acelera bastante las inserciones masivo; en ese caso **llama siempre a `close()`** al terminar.
+`flushInterval: 0` (the default) writes every change: maximum durability. A higher value batches metadata writes, which speeds up bulk inserts considerably; in that case **always call `close()`** when you are done.
 
 ---
 
-## Esquemas y validación
+## Schemas and validation
 
 ```typescript
 const productSchema = new Schema({
@@ -212,30 +214,30 @@ const productSchema = new Schema({
   email: {
     type: 'string',
     validate: {
-      custom: async (value, doc) => isKnownEmail(value) || `Email inválido en ${doc.name}`
+      custom: async (value, doc) => isKnownEmail(value) || `Invalid email in ${doc.name}`
     }
   }
 })
 ```
 
-- `strict: true` (por defecto `false`) rechaza campos no declarados.
-- Los `default` pueden ser funciones que reciben el documento: `default: (doc) => ...`.
-- Los valores por defecto mutables (`[]`, `{}`) se clonan por documento.
-- `validate()` es síncrono; `validateAsync()`.awaita validadores asíncronos. `Collection` usa siempre la versión asíncrona.
+- `strict: true` (`false` by default) rejects fields that are not declared.
+- `default` values can be functions that receive the document: `default: (doc) => ...`.
+- Mutable default values (`[]`, `{}`) are cloned per document.
+- `validate()` is synchronous; `validateAsync()` awaits async validators. `Collection` always uses the async version.
 
-### Tipos admitidos
+### Supported types
 
 `string`, `number`, `int`, `boolean`, `date`, `object`, `array`, `null`.
 
 ---
 
-## Consultas
+## Queries
 
 ```typescript
-await users.find({})                                  // todos
-await users.find({ age: { $gt: 25 } })                // comparadores
-await users.find({ tags: 'premium' })                  // un elemento del array
-await users.find({ 'address.city': 'Lima' })           // campos anidados
+await users.find({})                                  // everything
+await users.find({ age: { $gt: 25 } })                // comparators
+await users.find({ tags: 'premium' })                  // one element of an array
+await users.find({ 'address.city': 'Lima' })           // nested fields
 await users.find({ $or: [{ age: { $lt: 18 } }, { vip: true }] })
 await users.find({ name: { $regex: '^ada', $options: 'i' } })
 await users.find({ 'items': { $elemMatch: { qty: { $gte: 5 } } } })
@@ -244,7 +246,7 @@ await users.find({ age: { $gte: 18 } }, {
   sort: { age: -1 },
   skip: 0,
   limit: 20,
-  projection: { name: 1, email: 1 }    // solo esos campos (+ _id)
+  projection: { name: 1, email: 1 }    // only those fields (+ _id)
 })
 
 await users.findOne({ email: 'ada@example.com' })
@@ -253,7 +255,7 @@ await users.countDocuments({ vip: true })
 await users.distinct('city')
 ```
 
-También puedes componer un `Query` a mano y pasarlo a `find()`:
+You can also build a `Query` by hand and pass it to `find()`:
 
 ```typescript
 import { Query } from 'docudb'
@@ -264,11 +266,11 @@ await users.find(query)
 
 ---
 
-## Índices
+## Indexes
 
 ```typescript
 await users.createIndex('email', { unique: true })
-await users.createIndex(['lastName', 'firstName'])   // índice compuesto
+await users.createIndex(['lastName', 'firstName'])   // compound index
 await users.createIndex('age', { sparse: true })
 await users.createIndexes([{ field: 'email' }, { field: 'city' }])
 
@@ -277,7 +279,7 @@ await users.dropIndex('email')
 await users.dropIndexes()
 ```
 
-Un índice responde igualdad (`$eq`), conjuntos (`$in`, `$nin`), rangos (`$gt`, `$gte`, `$lt`, `$lte`), negaciones (`$ne`, `$nin`) y prefijos de índices compuestos. Se puede comprobar con `explain()`:
+An index answers equality (`$eq`), sets (`$in`, `$nin`), ranges (`$gt`, `$gte`, `$lt`, `$lte`), negations (`$ne`, `$nin`) and prefixes of compound indexes. You can verify this with `explain()`:
 
 ```typescript
 await users.explain({ email: 'ada@example.com' })
@@ -291,11 +293,11 @@ await users.explain({ email: 'ada@example.com' })
 // }
 ```
 
-Un índice `unique` lanza `MCO_ERROR.INDEX.UNIQUE_VIOLATION` y **no** deja el documento escrito en disco.
+A `unique` index throws `MCO_ERROR.INDEX.UNIQUE_VIOLATION` and does **not** leave the document on disk.
 
 ---
 
-## Actualizaciones
+## Updates
 
 ```typescript
 await users.updateById(id, { $set: { age: 31 } })
@@ -303,12 +305,12 @@ await users.updateOne({ email: 'a@b.com' }, { $inc: { logins: 1 } })
 await users.updateMany({ status: 'draft' }, { $set: { status: 'active' } })
 await users.replaceOne({ email: 'a@b.com' }, { email: 'a@b.com', name: 'Ada' })
 await users.findOneAndUpdate({ email: 'a@b.com' }, { $inc: { logins: 1 } })
-await users.updateOne({ email: 'nuevo@b.com' }, { $set: { name: 'Nuevo' } }, { upsert: true })
+await users.updateOne({ email: 'new@b.com' }, { $set: { name: 'New' } }, { upsert: true })
 ```
 
-Operadores soportados: `$set`, `$unset`, `$inc`, `$mul`, `$min`, `$max`, `$push` (con `$each`, `$position` y `$slice`), `$addToSet`, `$pull`, `$pop` y `$rename`. Cualquier otro operador lanza un error explícito en lugar de ignorarse.
+Supported operators: `$set`, `$unset`, `$inc`, `$mul`, `$min`, `$max`, `$push` (with `$each`, `$position` and `$slice`), `$addToSet`, `$pull`, `$pop` and `$rename`. Any other operator throws an explicit error instead of being silently ignored.
 
-## Borrado
+## Deletes
 
 ```typescript
 await users.deleteById(id)                     // true | false
@@ -319,7 +321,7 @@ const gone = await users.findOneAndDelete({ status: 'archived' })
 
 ---
 
-## Agregación
+## Aggregation
 
 ```typescript
 const result = await orders.aggregate([
@@ -330,33 +332,33 @@ const result = await orders.aggregate([
 ])
 ```
 
-Etapas: `$match`, `$project`, `$group`, `$sort`, `$skip`, `$limit`, `$count`, `$unwind`.
-Acumuladores: `$sum`, `$avg`, `$min`, `$max`, `$first`, `$last`, `$push`, `$addToSet`, `$count`.
+Stages: `$match`, `$project`, `$group`, `$sort`, `$skip`, `$limit`, `$count`, `$unwind`.
+Accumulators: `$sum`, `$avg`, `$min`, `$max`, `$first`, `$last`, `$push`, `$addToSet`, `$count`.
 
 ---
 
-## Lotes
+## Bulk operations
 
 ```typescript
-await products.insertMany([...], { ordered: false })   // continúa tras un fallo
+await products.insertMany([...], { ordered: false })   // continues after a failure
 
 await products.bulkWrite([
-  { insertOne: { name: 'Lámpara' } },
-  { updateOne: { filter: { name: 'Lámpara' }, update: { $set: { price: 60 } } } },
-  { updateMany: { filter: { category: 'hogar' }, update: { $set: { active: true } } } },
+  { insertOne: { name: 'Lamp' } },
+  { updateOne: { filter: { name: 'Lamp' }, update: { $set: { price: 60 } } } },
+  { updateMany: { filter: { category: 'home' }, update: { $set: { active: true } } } },
   { deleteMany: { filter: { discontinued: true } } }
 ])
 ```
 
 ---
 
-## Mantenimiento
+## Maintenance
 
 ```typescript
-await db.stats()            // métricas por colección
-await db.compact()          // compacta el log de orden y los índices
-await db.backup('/ruta')    // copia el árbol de la base de datos
-await db.restore('/ruta')   // reemplaza el contenido con un backup
+await db.stats()            // metrics per collection
+await db.compact()          // compacts the order log and the indexes
+await db.backup('/path')    // copies the database tree
+await db.restore('/path')   // replaces the content with a backup
 await db.listCollections()
 await db.renameCollection('products', 'catalog')
 await db.dropCollection('catalog')
@@ -365,129 +367,130 @@ await db.collectionExists('catalog')
 
 ---
 
-## Manejo de errores
+## Error handling
 
-Todo error es un `DocuDBError` con `code`, `details`, `cause` y `timestamp`. El código original **se conserva** al reenvolver errores, así que puedes reaccionar a la causa real.
+Every error is a `DocuDBError` with `code`, `details`, `cause` and `timestamp`. The original code **is preserved** when errors are wrapped, so you can react to the real cause.
 
 ```typescript
 import { DocuDBError, MCO_ERROR } from 'docudb'
 
 try {
-  await users.insertOne({ name: 'X', email: 'no-es-un-email' })
+  await users.insertOne({ name: 'X', email: 'not-an-email' })
 } catch (error) {
   if (DocuDBError.isDocuDBError(error)) {
-    console.error(error.code)     // p. ej. MCO_ERROR.SCHEMA.INVALID_REGEX
-    console.error(error.details)   // campo, valor, patrón esperado
-    console.error(error.cause)     // error original
+    console.error(error.code)     // e.g. MCO_ERROR.SCHEMA.INVALID_REGEX
+    console.error(error.details)   // field, value, expected pattern
+    console.error(error.cause)     // original error
   }
 }
 ```
 
-| Código | Significado |
+| Code | Meaning |
 |---|---|
-| `DB011` | Base de datos no inicializada |
-| `DB014` | Base de datos cerrada |
-| `DB015` | Formato en disco no soportado (falta migrar) |
-| `DOC002` | Error al insertar |
-| `DOC010` | `_id` duplicado |
-| `SCH002` | Campo requerido ausente |
-| `SCH003` | Tipo inválido |
-| `SCH005` | Campo no permitido en modo estricto |
-| `SCH006` | Falló un validador personalizado |
-| `IDX004` | Violación de índice único |
-| `QUE001` | Operador de consulta inválido |
-| `QUE003` | Etapa de agregación no soportada |
+| `DB011` | Database not initialized |
+| `DB014` | Database closed |
+| `DB015` | Unsupported on-disk format (migration pending) |
+| `DOC002` | Error while inserting |
+| `DOC010` | Duplicate `_id` |
+| `SCH002` | Missing required field |
+| `SCH003` | Invalid type |
+| `SCH005` | Field not allowed in strict mode |
+| `SCH006` | A custom validator failed |
+| `IDX004` | Unique index violation |
+| `QUE001` | Invalid query operator |
+| `QUE003` | Unsupported aggregation stage |
 
-La lista completa vive en `MCO_ERROR`.
+The full list lives in `MCO_ERROR`.
 
 ---
 
-## Límites y rendimiento
+## Limits and performance
 
-DocuDB prioriza **claridad y cero infraestructura** sobre throughput. Números medidos con `npm run bench` en Windows, Node 22+, documentos pequeños (~120 B) con gzip:
+DocuDB prioritizes **clarity and zero infrastructure** over throughput. Numbers measured with `npm run bench` on Windows, Node 22+, small documents (~120 B) with gzip:
 
-| Operación | 10 000 documentos |
+| Operation | 10 000 documents |
 |---|---|
-| Lectura indexada (`find({ name })`) | **~1,4 ms** |
-| Lectura indexada por rango (`find({ n: { $gte } })`) | **~2,4 ms** |
-| Escaneo completo (`find({ group })` sin índice) | ~7 900 ms |
-| `insertMany` de 10 000 (write-through) | ~20 s |
-| `insertMany` de 10 000 (`flushInterval: 25`) | ~24 s |
-| Espacio en disco (10 000 docs, gzip) | ~1,6 MB |
+| Indexed read (`find({ name })`) | **~1,4 ms** |
+| Indexed range read (`find({ n: { $gte } })`) | **~2,4 ms** |
+| Full scan (`find({ group })` without an index) | ~7 900 ms |
+| `insertMany` of 10 000 (write-through) | ~20 s |
+| `insertMany` of 10 000 (`flushInterval: 25`) | ~24 s |
+| On-disk size (10 000 docs, gzip) | ~1,6 MB |
 
-Conclusión práctica: **crea un índice para todo campo por el que filtres**. El salto entre escaneo e índice es de tres a cuatro órdenes de magnitud.
+Practical conclusion: **create an index for every field you filter by**. The gap between a scan and an index is three to four orders of magnitude.
 
-Otros límites conocidos:
+Other known limits:
 
-- **Un solo proceso.** Dos procesos sobre el mismo directorio corrompen datos; activa `fileLock: true` si necesitas que DocuDB lo impida con un error claro.
-- **Sin transacciones.** Las operaciones multi-documento no son atómicas: usa operaciones idempotentes o el patrón outbox.
-- **Escala bien hasta ~10⁵–10⁶ documentos pequeños.** Más allá, evalúa un motor dedicado.
-- **Una consulta sin índice lee todos los documentos** de la colección; añade índices o usa `find` por `_id`.
-- DocuDB no cifra los datos en reposo.
+- **Single process.** Two processes on the same directory corrupt data; enable `fileLock: true` if you want DocuDB to prevent it with a clear error.
+- **No transactions.** Multi-document operations are not atomic: use idempotent operations or the outbox pattern.
+- **Scales well up to ~10⁵–10⁶ small documents.** Beyond that, evaluate a dedicated engine.
+- **A query without an index reads every document** in the collection; add indexes or query by `_id`.
+- DocuDB does not encrypt data at rest.
 
 ---
 
-## Migración de formato
+## Format migration
 
-El formato en disco v1 (un directorio por documento) se migra de forma explícita y verificada:
+The v1 on-disk format (one directory per document) is migrated explicitly and verifiably:
 
 ```typescript
 const db = new Database({ name: 'myDatabase', dataDir: './data' })
 await db.migrate({ from: 1, to: 2, backup: true })
 ```
 
-La migración copia, **verifica** el contenido de cada documento y solo entonces retira el formato anterior. Con `backup: true` (por defecto) se copia antes el árbol a `data.bak-<timestamp>/`. Al abrir un directorio v1 sin migrar, DocuDB lanza `DB015` en lugar de leerlo a medias.
+The migration copies, **verifies** the content of every document and only then removes the previous format. With `backup: true` (the default) the tree is copied to `data.bak-<timestamp>/` beforehand. When opening a v1 directory without migrating, DocuDB throws `DB015` instead of reading it halfway.
 
-### Layout actual (v2)
+### Current layout (v2)
 
 ```
 data/
-├── _format.json                    # versión del formato
+├── _format.json                    # format version
 └── myDatabase/
     ├── _database.json
     └── users/
-        ├── _metadata.json          # contador, índices, nextSeq (tamaño constante)
-        ├── _order.log              # log append-only con el orden de inserción
-        ├── _indices/email.idx      # snapshot de índice
+        ├── _metadata.json          # counter, indexes, nextSeq (constant size)
+        ├── _order.log              # append-only log with insertion order
+        ├── _indices/email.idx      # index snapshot
         └── docs/
-            ├── 6a1f….json.gz      # un archivo por documento
-            └── 6a2e….part-0000.json.gz   # varios si supera chunkSize
+            ├── 6a1f….json.gz      # one file per document
+            └── 6a2e….part-0000.json.gz   # several when it exceeds chunkSize
 ```
 
 ---
 
-## Seguridad
+## Security
 
-- Los nombres de base de datos y colecciones se validan contra una **allowlist** (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`), se rechazan los nombres reservados de Windows y se verifica que la ruta resuelta quede dentro del directorio permitido.
-- Las escrituras son **atómicas**: un corte de luz no deja metadata a medio escribir.
-- Las consultas se compilan a predicados: no hay `eval` ni inyección de código.
-- **DocuDB no cifra los datos.** Si necesitas cifrado en reposo, cifra los valores desde tu aplicación con `transform` en el esquema.
+- Database and collection names are validated against an **allowlist** (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`), Windows reserved names are rejected, and the resolved path is verified to stay inside the allowed directory.
+- Writes are **atomic**: a power cut never leaves metadata half written.
+- Queries are compiled into predicates: there is no `eval` and no code injection.
+- **DocuDB does not encrypt data.** If you need encryption at rest, encrypt values from your application with `transform` in the schema.
 
 ---
 
 ## Roadmap
 
-- [ ] Transacciones y operaciones multi-documento atómicas
-- [ ] Motor de almacenamiento enchufable (LMDB / SQLite) para datasets mayores
-- [ ] Búsqueda de texto completo
-- [ ] Replicación y modo de solo lectura
+- [ ] Transactions and atomic multi-document operations
+- [ ] Pluggable storage engine (LMDB / SQLite) for larger datasets
+- [ ] Full-text search
+- [ ] Replication and read-only mode
 
-Consulta [CHANGELOG.md](CHANGELOG.md) para el historial.
+See [CHANGELOG.md](CHANGELOG.md) for the history.
 
 ---
 
-## Contribución
+## Contributing
 
 ```bash
 npm install
-npm run verify   # typecheck + lint + tests + build
-npm run bench    # micro benchmarks
+npm run verify     # typecheck + lint + tests + build
+npm run docs:check # verify the English/Spanish docs are in sync
+npm run bench      # micro benchmarks
 ```
 
-Lee [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) y [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
-## Licencia
+## License
 
 [MIT](LICENSE.txt)

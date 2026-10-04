@@ -46,6 +46,7 @@
   "files": [
     "dist",
     "README.md",
+    "README.es.md",
     "LICENSE.txt"
   ],
   "sideEffects": false,
@@ -63,7 +64,8 @@
     "test:watch": "tsc -p tsconfig.test.json && mocha --watch",
     "bench": "npm run build:bench && node dist-bench/bench/bench.js",
     "build:bench": "tsc -p tsconfig.bench.json",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run docs:check && npm run build",
+    "docs:check": "node scripts/docs-check.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

@@ -1,91 +1,97 @@
 # Changelog
 
-Todas las novedades relevantes de DocuDB.
+All notable changes to DocuDB.
 
-El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
-el versionado sigue [SemVer](https://semver.org/lang/es/).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+versioning follows [SemVer](https://semver.org/).
+
+> 🇬🇧 **English** · 🇪🇸 [Español](CHANGELOG.es.md)
 
 ## [0.1.0]
 
-Primera versión pública estable del formato en disco **v2**.
+First stable public release of the **v2** on-disk format.
 
-### Añadido
+### Added
 
-- **API compatible con MongoDB**: `updateOne`, `replaceOne`,
+- **MongoDB-compatible API**: `updateOne`, `replaceOne`,
   `findOneAndUpdate`, `findOneAndDelete`, `countDocuments`,
   `estimatedDocumentCount`, `distinct`, `aggregate`, `bulkWrite`,
   `createIndexes`, `dropIndexes`.
-- **`find(filter, options)`** con `sort`, `skip`, `limit` y `projection`.
-  Antes `FindOptions` existía en los tipos pero se ignoraba.
-- **Operadores de actualización que antes no hacían nada**: `$push` (con `$each`,
-  `$position` y `$slice`), `$addToSet`, `$pull`, `$pop`, `$mul`, `$min`, `$max`.
-  Ahora un operador desconocido lanza un error explícito.
-- **Índices funcionales**: consultan igualdad, conjuntos (`$in`, `$nin`), rangos
-  (`$gt`, `$gte`, `$lt`, `$lte`) y negaciones, con soporte de prefijo para
-  índices compuestos. Antes **no se usaban nunca**.
-- `explain()` para comprobar el plan de ejecución.
-- **Agregación** con `$match`, `$project`, `$group`, `$sort`, `$skip`, `$limit`,
-  `$count` y `$unwind`.
-- **Ciclo de vida**: `close()`, `flush()`, `stats()`, `compact()`, `backup()`,
+- **`find(filter, options)`** with `sort`, `skip`, `limit` and `projection`.
+  `FindOptions` used to exist in the types but was ignored.
+- **Update operators that previously did nothing**: `$push` (with `$each`,
+  `$position` and `$slice`), `$addToSet`, `$pull`, `$pop`, `$mul`, `$min`,
+  `$max`. An unknown operator now throws an explicit error.
+- **Working indexes**: they answer equality, sets (`$in`, `$nin`), ranges
+  (`$gt`, `$gte`, `$lt`, `$lte`) and negations, with prefix support for
+  compound indexes. Before this release they **were never used**.
+- `explain()` to inspect the execution plan.
+- **Aggregation** with `$match`, `$project`, `$group`, `$sort`, `$skip`,
+  `$limit`, `$count` and `$unwind`.
+- **Lifecycle**: `close()`, `flush()`, `stats()`, `compact()`, `backup()`,
   `restore()`, `renameCollection()`, `collectionExists()`.
-- **Genéricos por colección**: `db.collection<User>('users')` tipa las
-  inserciones y las consultas; `InferSchema` deriva el tipo de un esquema.
-- **Validadores asíncronos** mediante `Schema.validateAsync()`.
-- **Formato en disco v2**: un archivo por documento, log append-only para el
-  orden, metadata de tamaño constante y escrituras atómicas.
-- **Migración v1 → v2** con backup, verificación por documento y reporte.
-- **Build dual ESM + CJS** con `exports` y tipos por condición.
-- **Lock file opcional** (`fileLock`) para impedir que dos procesos abras el
-  mismo directorio.
-- Opción `compression: 'auto'`, `compressionLevel` y `cacheSize` (caché LRU).
-- TypeScript estricto, ESLint, CI en GitHub Actions (Linux y Windows) y
-  micro benchmarks reproducibles con `npm run bench`.
+- **Generics per collection**: `db.collection<User>('users')` types
+  insertions and queries; `InferSchema` derives a type from a schema.
+- **Async validators** through `Schema.validateAsync()`.
+- **v2 on-disk format**: one file per document, an append-only log for the
+  order, constant-size metadata and atomic writes.
+- **v1 → v2 migration** with backup, per-document verification and a report.
+- **Dual ESM + CJS build** with `exports` and per-condition types.
+- **Optional lock file** (`fileLock`) to stop two processes from opening the
+  same directory.
+- `compression: 'auto'` option, `compressionLevel`, and an LRU `cacheSize`.
+- Strict TypeScript, ESLint, GitHub Actions CI (Linux and Windows) and
+  reproducible micro benchmarks via `npm run bench`.
 
-### Corregido
+### Fixed
 
-- **Los índices no se usaban.** `findByIndex` tenía la condición invertida:
-  devolvía `null` cuando el índice existía y desreferenciaba `undefined` cuando
-  no. Toda consulta acababa en escaneo completo.
-- **`$exists` estaba invertido**: `{ campo: { $exists: false } }` devolvía los
-  documentos que **sí** tenían el campo.
-- **`_id` duplicado sobrescribía en silencio** y el contador `count()` se
-  inflaba. Ahora lanza `DOC010` y el documento rechazado no queda en disco.
-- **La caché se devolvía por referencia**: mutar el resultado de `findById`
-  modificaba el estado interno. Ahora se devuelven copias defensivas.
-- **`dataDir` se ignoraba**: se le añadía un `data/` implícito. Ahora `dataDir`
-  es el directorio raíz y la base vive en `<dataDir>/<name>`.
-- **`timestamps: true` en la colección no hacía nada**. Ahora añade y mantiene
+- **Indexes were never used.** `findByIndex` had an inverted condition: it
+  returned `null` when the index existed and dereferenced `undefined` when it
+  did not. Every query ended up doing a full scan.
+- **`$exists` was inverted**: `{ field: { $exists: false } }` returned the
+  documents that **did** have the field.
+- **A duplicate `_id` silently overwrote** the document and inflated the
+  `count()` counter. It now throws `DOC010`, and the rejected document is not
+  left on disk.
+- **The cache was returned by reference**: mutating the result of `findById`
+  modified internal state. Results are now defensive copies.
+- **`dataDir` was ignored**: an implicit `data/` segment was appended. `dataDir`
+  is now the root directory and the database lives in `<dataDir>/<name>`.
+- **`timestamps: true` did nothing** on a collection. It now adds and maintains
   `createdAt` / `updatedAt`.
-- **`getPosition` rechazaba UUID** aunque la colección usara `idType: 'uuid'`.
-- **Los errores perdían su código**: un fallo de esquema o de índice único
-  llegaba como `DOC002` genérico. Ahora `DocuDBError` expone `cause` y
-  `wrap()` conserva el código original.
-- **Lost updates**: el lock se tomaba **después** del read-modify-write. Ahora
-  se toma antes y es un mutex FIFO en vez de un *spin-wait* sobre
+- **`getPosition` rejected UUIDs** even for collections using
+  `idType: 'uuid'`.
+- **Errors lost their code**: a schema failure or a unique index violation
+  surfaced as a generic `DOC002`. `DocuDBError` now exposes `cause`, and
+  `wrap()` preserves the original code.
+- **Lost updates**: the lock was taken **after** the read-modify-write. It is
+  now taken beforehand, as an FIFO mutex instead of a spin-wait over
   `global._documentLocks`.
-- **`$in` / `$nin` no comparaban elemento a elemento** en campos array.
-- **`strict` por defecto `true`**, lo que rechazaba campos no declarados y
-  contradecía los ejemplos del README. Ahora es `false`.
-- **Escrituras no atómicas**: un corte de luz podía dejar `_metadata.json` a
-  medias. Ahora todo pasa por temporal + `rename`, con serialización por ruta.
-- **`drop()` borraba documento por documento**; ahora borra el árbol y los
-  índices directamente.
-- **La validación de nombres usaba una lista de bloqueo** que rechazaba
-  cualquier nombre con punto y nombres como `hosts`. Ahora es una allowlist.
-- Se eliminó el `console.error` de la librería.
-- Se rellenaron los códigos de error que valían `undefined`.
+- **`$in` / `$nin` did not compare element by element** on array fields.
+- **`strict` defaulted to `true`**, which rejected undeclared fields and
+  contradicted the README examples. It now defaults to `false`.
+- **Non-atomic writes**: a power cut could leave `_metadata.json` half written.
+  Everything now goes through a temporary file plus `rename`, serialized per
+  path.
+- **`drop()` deleted document by document**; it now removes the tree and the
+  indexes directly.
+- **Name validation used a block list** that rejected any name containing a dot
+  and names such as `hosts`. It is now an allowlist.
+- Removed `console.error` from the library.
+- Filled in the error codes whose value was `undefined`.
 
-### Cambiado
+### Changed
 
-- **Rompe**: el formato en disco pasó de v1 a v2. Los directorios existentes
-  requieren `db.migrate({ from: 1, to: 2 })`; DocuDB se niega a abrirlos con un
-  error `DB015` en lugar de leerlos a medias.
-- La versión del paquete pasó de `0.0.0` a `0.1.0`.
-- `Schema` y `CollectionOptions.schema` pasan a ser la interfaz
-  `SchemaInterface`, para que los tipos no dependan de la clase concreta.
-- El paquete se publica con `exports`, así que los imports profundos
-  (`docudb/dist/...`) dejan de estar soportados.
+- **Breaking**: the on-disk format moved from v1 to v2. Existing directories
+  require `db.migrate({ from: 1, to: 2 })`; DocuDB refuses to open them with a
+  `DB015` error instead of reading them halfway.
+- The package version went from `0.0.0` to `0.1.0`.
+- `Schema` and `CollectionOptions.schema` are now typed as the
+  `SchemaInterface` interface, so the types no longer depend on the concrete
+  class.
+- The package is published with `exports`, so deep imports
+  (`docudb/dist/...`) are no longer supported.
 
-### Eliminado
+### Removed
 
-- `.npmignore`, redundante con el campo `files` de `package.json`.
+- `.npmignore`, redundant with the `files` field in `package.json`.
